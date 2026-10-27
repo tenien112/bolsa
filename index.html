@@ -205,6 +205,20 @@ const esEstado = m => /estado actual|funcionando|resumen diario/i.test(m.title |
 const deVig = (m, v) => (m.title || "").startsWith(v.p);
 function parte(m){ const x = (m.title || "").match(/\((\d)\/(\d)\)/); return x ? +x[1] : 0; }
 function ordena(ms){ return ms.slice().sort((a,b) => parte(a) - parte(b) || a.time - b.time); }
+// Une las partes (1/2, 2/2…) de un mismo estado en un solo mensaje
+function une(ms){
+  const sin = ms.filter(m => !parte(m));
+  const porParte = {};
+  ms.filter(m => parte(m)).forEach(m => { const k = parte(m); if (!porParte[k] || m.time > porParte[k].time) porParte[k] = m; });
+  const o = Object.keys(porParte).sort((a,b) => a - b).map(k => porParte[k]);
+  if (!o.length) return ordena(sin);
+  const unido = {
+    title: (o[0].title || "").replace(/\s*\(\d\/\d\)/, ""),
+    message: o.map(m => m.message || "").join("\n"),
+    time: Math.max(...o.map(m => m.time))
+  };
+  return ordena(sin).concat([unido]);
+}
 
 function hora(ts){ return new Date(ts*1000).toLocaleString("es-ES",{weekday:"short",day:"numeric",month:"numeric",hour:"2-digit",minute:"2-digit"}); }
 function hace(ts){
@@ -253,7 +267,7 @@ async function pintaGuardado(v){
     const est = ms.filter(esEstado);
     if (est.length){
       const ult = est[est.length-1].time;
-      const grupo = ordena(est.filter(m => ult - m.time < 180));
+      const grupo = une(est.filter(m => ult - m.time < 180));
       $("resGuardado").innerHTML = `<p class="etq">Último estado guardado · ${hace(ult)}</p>` + grupo.map(m => tarjeta(m, true)).join("");
     }
     const av = ms.filter(m => !esEstado(m)).reverse();
@@ -293,7 +307,7 @@ async function lanzar(v){
     try{
       const ms = (await leerNtfy(t0)).filter(m => deVig(m, v) && esEstado(m));
       if (ms.length){
-        $("resAhora").innerHTML = `<p class="etq">Ahora mismo</p>` + ordena(ms).map(m => tarjeta(m, false)).join("");
+        $("resAhora").innerHTML = `<p class="etq">Ahora mismo</p>` + une(ms).map(m => tarjeta(m, false)).join("");
         if (ms.length >= v.partes){
           parar(); estado("Estado actual recibido", "ok");
           $("resGuardado").innerHTML = ""; $("resRepetir").hidden = false;
@@ -319,7 +333,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.27-1";
+const APP_VERSION = "2026.10.27-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
