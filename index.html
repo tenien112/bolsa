@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BOLSA-LORENCITO</title>
+<meta name="author" content="Lorenzo Moreno Villalba">
+<meta name="copyright" content="© Lorenzo Moreno Villalba">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E1A14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bolsa">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E1A14; --panel:#15251C; --panel2:#1C3125; --line:#2A4234;
+  --txt:#E8F1EA; --mut:#8FA898; --oro:#F5C451; --verde:#2FBF71; --rojo:#E5484D;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Archivo,system-ui,sans-serif;min-height:100%}
+body{padding:max(16px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-inset-bottom));max-width:620px;margin:0 auto}
+header{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+header h1{font-size:22px;font-weight:900;letter-spacing:.5px;margin:0;flex:1}
+header h1 span{color:var(--oro)}
+.ico{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:12px;width:44px;height:44px;font-size:20px;cursor:pointer}
+.pant{display:none}
+.pant.on{display:block;animation:entra .2s ease}
+@keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.grandes{display:grid;gap:16px;margin-top:8px}
+.grande{border:0;border-radius:22px;padding:34px 20px;font:900 30px Archivo,sans-serif;letter-spacing:1px;color:#0E1A14;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 6px 0 rgba(0,0,0,.35)}
+.grande:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.grande .e{font-size:40px}
+.g-robot{background:var(--oro)}
+.g-radar{background:var(--verde)}
+.sub{color:var(--mut);font-size:14px;margin:4px 0 16px}
+.lista{display:grid;gap:12px}
+.opc{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--oro);border-radius:16px;color:var(--txt);text-align:left;padding:18px 16px;font:700 17px Archivo,sans-serif;cursor:pointer;line-height:1.25}
+.opc small{display:block;color:var(--mut);font-weight:500;font-size:13px;margin-top:5px}
+.opc.radar{border-left-color:var(--verde)}
+.opc:active{background:var(--panel2)}
+.volver{background:none;border:0;color:var(--oro);font:700 16px Archivo,sans-serif;padding:6px 0;margin-bottom:10px;cursor:pointer}
+h2{font-size:19px;margin:0 0 6px;line-height:1.25}
+.estado{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:12px 0;font-size:15px}
+.estado.ok{border-color:var(--verde)}
+.estado.mal{border-color:var(--rojo)}
+.spin{width:18px;height:18px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--oro);animation:gira 1s linear infinite;flex:none}
+@keyframes gira{to{transform:rotate(360deg)}}
+.bloque{margin-top:14px}
+.etq{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin:0 0 8px}
+.msg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.msg .t{font-weight:700;font-size:14px;color:var(--oro);margin-bottom:8px}
+.msg .h{font-size:12px;color:var(--mut);margin-top:6px}
+.lin{font:400 13.5px/1.45 "JetBrains Mono",monospace;padding:6px 8px;border-radius:8px;margin:2px 0;white-space:pre-wrap;word-break:break-word}
+.lin.b{background:rgba(229,72,77,.13);border-left:3px solid var(--rojo)}
+.lin.a{background:rgba(47,191,113,.13);border-left:3px solid var(--verde)}
+.vieja{opacity:.75}
+.btn{background:var(--oro);color:#0E1A14;border:0;border-radius:14px;padding:14px 18px;font:900 16px Archivo,sans-serif;cursor:pointer;width:100%;margin-top:6px}
+.btn.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+.caja{background:var(--panel);border:1px dashed var(--oro);border-radius:14px;padding:14px;margin:12px 0;font-size:14px;line-height:1.45}
+.caja a{color:var(--oro)}
+input{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:#0B140F;color:var(--txt);font:400 15px "JetBrains Mono",monospace;margin:8px 0}
+details summary{cursor:pointer;color:var(--mut);font-size:14px;margin:8px 0}
+footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-height:1.6}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:var(--oro);color:#0E1A14;font-weight:700;padding:12px 18px;border-radius:14px;transition:transform .3s;z-index:9;max-width:90%;text-align:center}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#install{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>BOLSA-<span>LORENCITO</span></h1>
+  <button class="ico" id="bLlave" title="Llave de GitHub" aria-label="Ajustes">⚙️</button>
+</header>
+
+<!-- INICIO -->
+<section class="pant on" id="pInicio">
+  <div class="grandes">
+    <button class="grande g-robot" data-ir="pRobot"><span class="e">🤖</span>ROBOT</button>
+    <button class="grande g-radar" data-ir="pRadar"><span class="e">📡</span>RADAR</button>
+  </div>
+  <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
+</section>
+
+<!-- ROBOTS -->
+<section class="pant" id="pRobot">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>🤖 ROBOTS</h2>
+  <p class="sub">Pulsa uno y te sale aquí su estado actual.</p>
+  <div class="lista" id="lRobot"></div>
+</section>
+
+<!-- RADARES -->
+<section class="pant" id="pRadar">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>📡 RADARES</h2>
+  <p class="sub">Pulsa uno y te sale aquí su estado actual.</p>
+  <div class="lista" id="lRadar"></div>
+</section>
+
+<!-- RESULTADO -->
+<section class="pant" id="pRes">
+  <button class="volver" id="resVolver">← Volver</button>
+  <h2 id="resTit"></h2>
+  <div class="estado" id="resEstado"><div class="spin"></div><span>Cargando…</span></div>
+  <div id="resAhora" class="bloque"></div>
+  <div id="resGuardado" class="bloque"></div>
+  <div id="resAvisos" class="bloque"></div>
+  <button class="btn" id="resRepetir" hidden>🔄 Volver a ejecutar</button>
+</section>
+
+<!-- LLAVE -->
+<section class="pant" id="pLlave">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>⚙️ Llave de GitHub</h2>
+  <div class="caja">
+    Para que la app <b>ejecute</b> los vigilantes al momento necesita una llave de GitHub (solo una vez; se queda guardada en este móvil).<br><br>
+    1. Abre <a href="https://github.com/settings/tokens/new?scopes=repo&description=BOLSA-LORENCITO" target="_blank" rel="noopener">este enlace</a> (ya va rellenado).<br>
+    2. En «Expiration» elige <b>No expiration</b>.<br>
+    3. Pulsa <b>Generate token</b>, cópialo y pégalo aquí.
+  </div>
+  <input id="llave" placeholder="ghp_…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <button class="btn" id="guardaLlave">Guardar llave</button>
+  <button class="btn sec" id="borraLlave">Borrar llave</button>
+  <p class="sub" id="llaveEstado"></p>
+</section>
+
+<footer>BOLSA-LORENCITO · by Lorenzo<br>© <span id="year">2026</span> Lorenzo Moreno Villalba. Todos los derechos reservados.</footer>
+<div id="toast"></div>
+
+<script>
+const REPO = "tenien112/forex-alertas";
+const TEMA = "forex-lorenzito-7k3q9";
+// Cada vigilante: archivo del workflow, inicio del título de sus avisos ntfy y cuántos mensajes manda en la prueba
+const VIG = {
+  robot: [
+    {n:"BOT COMPRAVENTA", d:"Oro, plata, bitcoin, petróleo y 14 pares de divisas", wf:"vigilante-oro.yml", p:"VIGILANTE BOT COMPRAVENTA", partes:2},
+    {n:"BOT COMMODITIES", d:"H1-H2-H4-H8 · oro, plata, platino, paladio, petróleo, bitcoin, ethereum", wf:"commodities.yml", p:"VIGILANTE BOT COMMODITIES", partes:1},
+  ],
+  radar: [
+    {n:"RADAR CAMBIO TENDENCIAS", d:"Tendencias de los pares de divisas", wf:"vigilante.yml", p:"VIGILANTE RADAR CAMBIO TENDENCIAS", partes:1},
+    {n:"COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · metales, petróleo y criptos", wf:"radar-commodities.yml", p:"VIGILANTE COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:1},
+    {n:"FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · 16 pares de divisas", wf:"radar-forex.yml", p:"VIGILANTE FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:2},
+  ]
+};
+
+const $ = id => document.getElementById(id);
+function store(k, v){
+  try{
+    if (v === undefined){ const x = localStorage.getItem(k); return x === null ? null : JSON.parse(x); }
+    if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v));
+  }catch(e){ return null; }
+}
+let toastTimer;
+function toast(t, ms=3000){ const el=$("toast"); el.textContent=t; el.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"), ms); }
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---------- Navegación ----------
+let pantalla = "pInicio", origen = "pInicio";
+function ir(id){
+  document.querySelectorAll(".pant").forEach(p => p.classList.toggle("on", p.id === id));
+  pantalla = id; window.scrollTo(0,0);
+  if (id !== "pRes") parar();
+}
+document.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => ir(b.dataset.ir));
+$("resVolver").onclick = () => ir(origen);
+$("bLlave").onclick = () => { $("llave").value = store("bolsa_llave") || ""; pintaLlave(); ir("pLlave"); };
+
+function pintaLista(tipo){
+  const l = $(tipo === "robot" ? "lRobot" : "lRadar"); l.innerHTML = "";
+  VIG[tipo].forEach(v => {
+    const b = document.createElement("button");
+    b.className = "opc" + (tipo === "radar" ? " radar" : "");
+    b.innerHTML = esc(v.n) + "<small>" + esc(v.d) + "</small>";
+    b.onclick = () => abrir(v, tipo === "robot" ? "pRobot" : "pRadar");
+    l.appendChild(b);
+  });
+}
+pintaLista("robot"); pintaLista("radar");
+
+// ---------- Llave ----------
+function pintaLlave(){ $("llaveEstado").textContent = store("bolsa_llave") ? "✅ Hay una llave guardada en este móvil." : "No hay llave guardada: la app solo enseña el último estado guardado."; }
+$("guardaLlave").onclick = async () => {
+  const k = $("llave").value.trim();
+  if (!k){ toast("Pega la llave primero"); return; }
+  $("llaveEstado").textContent = "Comprobando…";
+  try{
+    const r = await fetch(`https://api.github.com/repos/${REPO}`, {headers:{Authorization:"Bearer "+k, Accept:"application/vnd.github+json"}});
+    if (!r.ok) throw new Error(r.status);
+    store("bolsa_llave", k); pintaLlave(); toast("Llave guardada ✅"); setTimeout(()=>ir("pInicio"), 800);
+  }catch(e){ $("llaveEstado").textContent = "❌ GitHub no acepta esa llave (" + e.message + "). Revisa que la copiaste entera."; }
+};
+$("borraLlave").onclick = () => { store("bolsa_llave", null); $("llave").value = ""; pintaLlave(); toast("Llave borrada"); };
+
+// ---------- ntfy ----------
+async function leerNtfy(since){
+  const r = await fetch(`https://ntfy.sh/${TEMA}/json?poll=1&since=${since}`, {cache:"no-store"});
+  const t = await r.text();
+  return t.split("\n").filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } })
+          .filter(m => m && m.event === "message");
+}
+const esEstado = m => /estado actual|funcionando|resumen diario/i.test(m.title || "");
+const deVig = (m, v) => (m.title || "").startsWith(v.p);
+function parte(m){ const x = (m.title || "").match(/\((\d)\/(\d)\)/); return x ? +x[1] : 0; }
+function ordena(ms){ return ms.slice().sort((a,b) => parte(a) - parte(b) || a.time - b.time); }
+
+function hora(ts){ return new Date(ts*1000).toLocaleString("es-ES",{weekday:"short",day:"numeric",month:"numeric",hour:"2-digit",minute:"2-digit"}); }
+function hace(ts){
+  const s = Math.max(0, Date.now()/1000 - ts);
+  if (s < 90) return "hace un momento";
+  if (s < 3600) return "hace " + Math.round(s/60) + " min";
+  const h = Math.floor(s/3600), mi = Math.round((s%3600)/60);
+  return "hace " + h + " h" + (mi ? " " + mi + " min" : "");
+}
+function tarjeta(m, vieja){
+  const lineas = (m.message || "").split("\n").map(l => {
+    const cls = /BAJISTA|CORTO|⬇|🔴|baja/i.test(l) ? " b" : /ALCISTA|LARGO|⬆|🟢|sube/i.test(l) ? " a" : "";
+    return l.trim() ? `<div class="lin${cls}">${esc(l)}</div>` : "";
+  }).join("");
+  const tit = (m.title || "").replace(/^VIGILANTE\s+/i, "");
+  return `<div class="msg${vieja ? " vieja" : ""}"><div class="t">${esc(tit)}</div>${lineas}<div class="h">${hora(m.time)} · ${hace(m.time)}</div></div>`;
+}
+
+// ---------- Ejecutar un vigilante ----------
+let sondeo = null, reloj = null, actual = null;
+function parar(){ clearInterval(sondeo); clearInterval(reloj); sondeo = reloj = null; }
+function estado(txt, tipo){
+  const el = $("resEstado"); el.className = "estado" + (tipo ? " " + tipo : "");
+  el.innerHTML = (tipo ? (tipo === "ok" ? "✅" : "⚠️") : '<div class="spin"></div>') + `<span>${txt}</span>`;
+}
+
+async function abrir(v, desde){
+  parar(); actual = v; origen = desde;
+  $("resTit").textContent = v.n;
+  $("resAhora").innerHTML = $("resGuardado").innerHTML = $("resAvisos").innerHTML = "";
+  $("resRepetir").hidden = true;
+  ir("pRes");
+  estado("Buscando el último estado…");
+  await pintaGuardado(v);
+  if (actual !== v) return;
+  if (store("bolsa_llave")) lanzar(v);
+  else {
+    estado("Esto es lo último guardado. Para ejecutarlo al momento, pon tu llave en ⚙️", "mal");
+    $("resRepetir").hidden = true;
+  }
+}
+
+async function pintaGuardado(v){
+  try{
+    const ms = (await leerNtfy("12h")).filter(m => deVig(m, v));
+    const est = ms.filter(esEstado);
+    if (est.length){
+      const ult = est[est.length-1].time;
+      const grupo = ordena(est.filter(m => ult - m.time < 180));
+      $("resGuardado").innerHTML = `<p class="etq">Último estado guardado · ${hace(ult)}</p>` + grupo.map(m => tarjeta(m, true)).join("");
+    }
+    const av = ms.filter(m => !esEstado(m)).reverse();
+    if (av.length){
+      $("resAvisos").innerHTML = `<details><summary>Avisos de las últimas 12 horas (${av.length})</summary>${av.map(m => tarjeta(m, true)).join("")}</details>`;
+    }
+    if (!est.length && !av.length) $("resGuardado").innerHTML = `<p class="sub">No hay mensajes de este vigilante en las últimas 12 horas.</p>`;
+  }catch(e){
+    $("resGuardado").innerHTML = `<p class="sub">No se han podido leer los mensajes guardados (¿sin conexión?).</p>`;
+  }
+}
+
+async function lanzar(v){
+  parar();
+  $("resRepetir").hidden = true; $("resAhora").innerHTML = "";
+  const t0 = Math.floor(Date.now()/1000) - 5;
+  estado("Ejecutando " + v.n + "…");
+  try{
+    const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${v.wf}/dispatches`, {
+      method:"POST",
+      headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github+json", "Content-Type":"application/json"},
+      body: JSON.stringify({ref:"main", inputs:{prueba:"true"}})
+    });
+    if (r.status === 401 || r.status === 403 || r.status === 404){ estado("GitHub no acepta la llave guardada. Ponla otra vez en ⚙️", "mal"); return; }
+    if (!r.ok) throw new Error("GitHub respondió " + r.status);
+  }catch(e){
+    estado("No se pudo ejecutar: " + e.message, "mal"); $("resRepetir").hidden = false; return;
+  }
+  const inicio = Date.now();
+  reloj = setInterval(() => {
+    const s = Math.round((Date.now() - inicio)/1000);
+    const extra = s > 150 ? " · GitHub va con cola, sigo esperando" : "";
+    estado(`Ejecutando en GitHub… ${s} s (suele tardar 1-2 min)${extra}`);
+  }, 1000);
+  const revisar = async () => {
+    if (actual !== v) return parar();
+    try{
+      const ms = (await leerNtfy(t0)).filter(m => deVig(m, v) && esEstado(m));
+      if (ms.length){
+        $("resAhora").innerHTML = `<p class="etq">Ahora mismo</p>` + ordena(ms).map(m => tarjeta(m, false)).join("");
+        if (ms.length >= v.partes){
+          parar(); estado("Estado actual recibido", "ok");
+          $("resGuardado").innerHTML = ""; $("resRepetir").hidden = false;
+          if (navigator.vibrate) navigator.vibrate(80);
+          return;
+        }
+      }
+    }catch(e){}
+    if (Date.now() - inicio > 6*60*1000){ parar(); estado("No ha llegado respuesta en 6 minutos. Prueba otra vez.", "mal"); $("resRepetir").hidden = false; }
+  };
+  sondeo = setInterval(revisar, 5000);
+}
+$("resRepetir").onclick = () => actual && lanzar(actual);
+
+// ---------- Instalar ----------
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").style.display = "block"; });
+window.addEventListener("appinstalled", () => { $("install").style.display = "none"; installEvt = null; toast("BOLSA-LORENCITO instalada"); });
+$("install").onclick = async () => {
+  if (installEvt){ installEvt.prompt(); try{ await installEvt.userChoice; }catch(e){} installEvt = null; $("install").style.display = "none"; }
+};
+$("year").textContent = new Date().getFullYear();
+
+// ---------- Aviso de actualización ----------
+// Hay que cambiar APP_VERSION en cada actualización.
+const APP_VERSION = "2026.10.27-1";
+(() => {
+  const prev = store("bolsa_version");
+  store("bolsa_version", APP_VERSION);
+  if (prev !== null && prev !== APP_VERSION) toast("BOLSA-LORENCITO se ha actualizado", 4000);
+})();
+if ("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{});
+  let recargada=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(!recargada){ recargada=true; location.reload(); } });
+}
+async function buscarVersionNueva(){
+  try{
+    const t = await (await fetch("./?v="+Date.now(),{cache:"no-store"})).text();
+    const m = t.match(/const APP_VERSION = "([^"]+)"/);
+    if (m && m[1] !== APP_VERSION && pantalla !== "pRes"){
+      let ult = 0; try{ ult = +sessionStorage.getItem("bolsa_recarga")||0; }catch(e){}
+      if (Date.now()-ult > 15000){ try{ sessionStorage.setItem("bolsa_recarga", Date.now()); }catch(e){} location.reload(); }
+    }
+  }catch(e){}
+}
+buscarVersionNueva();
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") buscarVersionNueva(); });
+window.addEventListener("pageshow",e=>{ if(e.persisted) buscarVersionNueva(); });
+</script>
+</body>
+</html>
