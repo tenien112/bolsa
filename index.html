@@ -333,7 +333,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.27-2";
+const APP_VERSION = "2026.10.27-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
@@ -348,13 +348,14 @@ async function buscarVersionNueva(){
   try{
     const t = await (await fetch("./?v="+Date.now(),{cache:"no-store"})).text();
     const m = t.match(/const APP_VERSION = "([^"]+)"/);
-    if (m && m[1] !== APP_VERSION && pantalla !== "pRes"){
+    if (m && m[1] !== APP_VERSION && !sondeo){
       let ult = 0; try{ ult = +sessionStorage.getItem("bolsa_recarga")||0; }catch(e){}
       if (Date.now()-ult > 15000){ try{ sessionStorage.setItem("bolsa_recarga", Date.now()); }catch(e){} location.reload(); }
     }
   }catch(e){}
 }
 buscarVersionNueva();
+setInterval(buscarVersionNueva, 30000);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") buscarVersionNueva(); });
 window.addEventListener("pageshow",e=>{ if(e.persisted) buscarVersionNueva(); });
 </script>
