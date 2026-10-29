@@ -239,19 +239,27 @@ const TV_ESP = {"ORO":"OANDA:XAUUSD","PLATA":"OANDA:XAGUSD","PETROLEO WTI":"TVC:
 function simboloTV(l){
   const u = l.toUpperCase();
   const fx = u.match(/\b([A-Z]{3})\/([A-Z]{3})\b/);
-  if (fx) return "FX:" + fx[1] + fx[2];
+  if (fx) return (fx[1] === "CNH" || fx[2] === "CNH" ? "FX_IDC:" : "FX:") + fx[1] + fx[2];
   for (const k of Object.keys(TV_ESP).sort((a,b) => b.length - a.length)) if (u.includes(k)) return TV_ESP[k];
   return "";
 }
+function intervaloTV(l){
+  // Temporalidad que cambió la última: marcada [H1.] (o con subrayado Unicode en mensajes viejos); si no hay, M30
+  const limpio = l.replace(/((?:[^\u0332]\u0332)+)/g, x => "[" + x.replace(/\u0332/g, "") + "]");
+  const m = limpio.match(/\[([MHDW])(\d*)[+\-.]\]/);
+  if (!m) return "30";
+  const n = parseInt(m[2] || "1", 10);
+  return m[1] === "M" ? String(n) : m[1] === "H" ? String(n * 60) : m[1];
+}
 document.addEventListener("click", e => {
   const d = e.target.closest(".lin.tv"); if (!d) return;
-  window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(d.dataset.tv), "_blank");
+  window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(d.dataset.tv) + "&interval=" + (d.dataset.tf || "30"), "_blank");
 });
 function tarjeta(m, vieja){
   const lineas = (m.message || "").split("\n").map(l => {
     const cls = /BAJISTA|CORTO|⬇|🔴|baja/i.test(l) ? " b" : /ALCISTA|LARGO|⬆|🟢|sube/i.test(l) ? " a" : "";
-    const sim = simboloTV(l);
-    return l.trim() ? `<div class="lin${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}"` : ""}>${subraya(esc(l))}</div>` : "";
+    const sim = simboloTV(l), tfm = intervaloTV(l);
+    return l.trim() ? `<div class="lin${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}" data-tf="${tfm}"` : ""}>${subraya(esc(l))}</div>` : "";
   }).join("");
   const tit = (m.title || "").replace(/^VIGILANTE\s+/i, "");
   return `<div class="msg${vieja ? " vieja" : ""}"><div class="t">${esc(tit)}</div>${lineas}<div class="h">${hora(m.time)} · ${hace(m.time)}</div></div>`;
@@ -353,7 +361,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-2";
+const APP_VERSION = "2026.10.29-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
