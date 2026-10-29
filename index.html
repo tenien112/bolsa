@@ -244,12 +244,16 @@ function simboloTV(l){
   return "";
 }
 function intervaloTV(l){
-  // Temporalidad que cambió la última: marcada [H1.] (o con subrayado Unicode en mensajes viejos); si no hay, M30
-  const limpio = l.replace(/((?:[^\u0332]\u0332)+)/g, x => "[" + x.replace(/\u0332/g, "") + "]");
-  const m = limpio.match(/\[([MHDW])(\d*)[+\-.]\]/);
-  if (!m) return "30";
-  const n = parseInt(m[2] || "1", 10);
-  return m[1] === "M" ? String(n) : m[1] === "H" ? String(n * 60) : m[1];
+  // Siempre la temporalidad más alta que aparezca en la línea (M30, H1, H2, H4, D...); si no hay ninguna, H2
+  const limpio = l.replace(/\u0332/g, "");
+  let max = 0;
+  for (const m of limpio.matchAll(/\b([MHDW])(\d*)[+\-.\]]/g)){
+    const n = parseInt(m[2] || "1", 10);
+    const min = m[1] === "M" ? n : m[1] === "H" ? n * 60 : m[1] === "D" ? n * 1440 : n * 10080;
+    if (min > max) max = min;
+  }
+  if (!max) return "120";
+  return max >= 10080 ? "W" : max >= 1440 ? "D" : String(max);
 }
 document.addEventListener("click", e => {
   const d = e.target.closest(".lin.tv"); if (!d) return;
@@ -361,7 +365,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-3";
+const APP_VERSION = "2026.10.29-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
