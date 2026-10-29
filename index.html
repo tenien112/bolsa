@@ -87,6 +87,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .eleg .e{font-size:28px}
 .e-tv{background:var(--azul);color:#0E1A14}
 .e-xtb{background:var(--rojo);color:#fff}
+.e-web{background:#F2F2F2;color:#B3121B}
 </style>
 </head>
 <body>
@@ -164,7 +165,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
     <h3 id="hojaTit"></h3>
     <p class="sub">¿Dónde lo quieres abrir?</p>
     <button class="eleg e-tv" id="abreTV"><span class="e">📈</span><span>TradingView<small>Se abre en el gráfico de este mercado</small></span></button>
-    <button class="eleg e-xtb" id="abreXTB"><span class="e">💼</span><span>XTB<small id="xtbSub"></small></span></button>
+    <button class="eleg e-web" id="abreXTBWeb"><span class="e">🌐</span><span>XTB en el navegador<small class="xtbSub"></small></span></button>
+    <button class="eleg e-xtb" id="abreXTB"><span class="e">📱</span><span>App de XTB<small class="xtbSub"></small></span></button>
     <button class="btn sec" id="hojaCerrar">Cancelar</button>
   </div>
 </div>
@@ -292,7 +294,7 @@ function intervaloTV(l){
   if (!max) return "120";
   return max >= 10080 ? "W" : max >= 1440 ? "D" : String(max);
 }
-// Pulsar un mercado: elegir entre TradingView y XTB
+// Pulsar un mercado: elegir entre TradingView, XTB en el navegador o la app de XTB
 const XTB_ESP = {"XAUUSD":"GOLD","XAGUSD":"SILVER","USOIL":"OIL.WTI","BTCUSD":"BITCOIN"};
 const simboloXTB = tv => { const b = tv.split(":").pop(); return XTB_ESP[b] || b; };
 let elegido = null;
@@ -302,7 +304,7 @@ document.addEventListener("click", e => {
   elegido = {tv: d.dataset.tv, tf: d.dataset.tf || "30"};
   const x = simboloXTB(elegido.tv);
   $("hojaTit").textContent = x;
-  $("xtbSub").textContent = "Se abre XTB y se copia «" + x + "»: pégalo en el buscador";
+  document.querySelectorAll(".xtbSub").forEach(el => el.textContent = "Se copia «" + x + "»: pégalo en el buscador");
   $("hoja").classList.add("on");
 });
 $("hoja").onclick = e => { if (e.target.id === "hoja") cierraHoja(); };
@@ -312,13 +314,21 @@ $("abreTV").onclick = () => {
   window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(elegido.tv) + "&interval=" + elegido.tf, "_blank");
   cierraHoja();
 };
-$("abreXTB").onclick = () => {
-  if (!elegido) return;
+function copiaXTB(){
   const x = simboloXTB(elegido.tv);
-  // Copiar y abrir en el mismo toque (si se espera, el móvil bloquea abrir la app)
+  // Copiar y abrir en el mismo toque (si se espera, el móvil bloquea abrir)
   try{ navigator.clipboard.writeText(x).catch(()=>{}); }catch(err){}
   toast("«" + x + "» copiado: pégalo en el buscador de XTB", 4000);
   cierraHoja();
+}
+$("abreXTBWeb").onclick = () => {
+  if (!elegido) return;
+  copiaXTB();
+  window.open("https://xstation5.xtb.com/", "_blank");
+};
+$("abreXTB").onclick = () => {
+  if (!elegido) return;
+  copiaXTB();
   const tienda = "https://play.google.com/store/apps/details?id=com.xtb.xmobile2";
   if (/Android/i.test(navigator.userAgent))
     location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.xtb.xmobile2;S.browser_fallback_url=" + encodeURIComponent(tienda) + ";end";
@@ -456,7 +466,7 @@ function pintaComunes(radarMsg, botMsg, etiqueta){
   $("comRes").innerHTML = `<p class="etq">${etiqueta}</p>`
     + grupo("🔴 BAJISTAS + CORTO", baj, "b")
     + grupo("🟢 ALCISTAS + LARGO", alc, "a")
-    + `<p class="nota">Radar: ${hora(radarMsg.time)} (${hace(radarMsg.time)}) · Bot: ${hora(botMsg.time)} (${hace(botMsg.time)})<br>Pulsa un mercado para abrirlo en TradingView o en XTB.</p>`;
+    + `<p class="nota">Radar: ${hora(radarMsg.time)} (${hace(radarMsg.time)}) · Bot: ${hora(botMsg.time)} (${hace(botMsg.time)})<br>Pulsa un mercado para abrirlo en TradingView o en XTB (navegador o app).</p>`;
   return baj.length + alc.length;
 }
 // Último estado (unido) de un vigilante entre unos mensajes
@@ -527,7 +537,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-7";
+const APP_VERSION = "2026.10.29-8";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
