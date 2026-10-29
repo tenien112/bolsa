@@ -276,7 +276,7 @@ function hace(ts){
 const subraya = t => t.replace(/((?:[^\u0332]\u0332)+)/g, x => "<u>" + x.replace(/\u0332/g, "") + "</u>")
                       .replace(/\[((?:M|H|D|W)\d+[+\-.])\]/g, "<u>$1</u>");
 // Pulsar una línea abre ese mercado en TradingView
-const TV_ESP = {"ORO":"OANDA:XAUUSD","PLATA":"OANDA:XAGUSD","PETROLEO WTI":"TVC:USOIL","PETRÓLEO WTI":"TVC:USOIL","PETROLEO":"TVC:USOIL","PETRÓLEO":"TVC:USOIL","WTI":"TVC:USOIL","BITCOIN":"BITSTAMP:BTCUSD"};
+const TV_ESP = {"ORO":"OANDA:XAUUSD","PLATA":"OANDA:XAGUSD","PETROLEO WTI":"TVC:USOIL","PETRÓLEO WTI":"TVC:USOIL","PETROLEO":"TVC:USOIL","PETRÓLEO":"TVC:USOIL","WTI":"TVC:USOIL","BITCOIN":"BITSTAMP:BTCUSD","PLATINO":"OANDA:XPTUSD","PALADIO":"OANDA:XPDUSD","ETHEREUM":"BITSTAMP:ETHUSD"};
 function simboloTV(l){
   const u = l.toUpperCase();
   const fx = u.match(/\b([A-Z]{3})\/([A-Z]{3})\b/);
@@ -297,7 +297,7 @@ function intervaloTV(l){
   return max >= 10080 ? "W" : max >= 1440 ? "D" : String(max);
 }
 // Pulsar un mercado: elegir entre TradingView, XTB en el navegador, la app de XTB o cTrader
-const XTB_ESP = {"XAUUSD":"GOLD","XAGUSD":"SILVER","USOIL":"OIL.WTI","BTCUSD":"BITCOIN"};
+const XTB_ESP = {"XAUUSD":"GOLD","XAGUSD":"SILVER","USOIL":"OIL.WTI","BTCUSD":"BITCOIN","XPTUSD":"PLATINUM","XPDUSD":"PALLADIUM","ETHUSD":"ETHEREUM"};
 const simboloXTB = tv => { const b = tv.split(":").pop(); return XTB_ESP[b] || b; };
 const simboloCT = tv => tv.split(":").pop();
 let elegido = null;
@@ -552,7 +552,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-9";
+const APP_VERSION = "2026.10.29-10";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
