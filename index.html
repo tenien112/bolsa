@@ -17,7 +17,7 @@
 <style>
 :root{
   --bg:#0E1A14; --panel:#15251C; --panel2:#1C3125; --line:#2A4234;
-  --txt:#E8F1EA; --mut:#8FA898; --oro:#F5C451; --verde:#2FBF71; --rojo:#E5484D;
+  --txt:#E8F1EA; --mut:#8FA898; --oro:#F5C451; --verde:#2FBF71; --rojo:#E5484D; --azul:#6CB4F7;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Archivo,system-ui,sans-serif;min-height:100%}
@@ -35,6 +35,12 @@ header h1 span{color:var(--oro)}
 .grande .e{font-size:40px}
 .g-robot{background:var(--oro)}
 .g-radar{background:var(--verde)}
+.g-comunes{background:var(--azul)}
+.grupo{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.grupo .t{font-weight:900;font-size:15px;margin-bottom:8px}
+.grupo.b .t{color:var(--rojo)} .grupo.a .t{color:var(--verde)}
+.vacio{color:var(--mut);font-size:14px;padding:4px 2px}
+.nota{color:var(--mut);font-size:12.5px;line-height:1.5;margin-top:6px}
 .sub{color:var(--mut);font-size:14px;margin:4px 0 16px}
 .lista{display:grid;gap:12px}
 .opc{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--oro);border-radius:16px;color:var(--txt);text-align:left;padding:18px 16px;font:700 17px Archivo,sans-serif;cursor:pointer;line-height:1.25}
@@ -83,6 +89,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
   <div class="grandes">
     <button class="grande g-robot" data-ir="pRobot"><span class="e">🤖</span>ROBOT</button>
     <button class="grande g-radar" data-ir="pRadar"><span class="e">📡</span>RADAR</button>
+    <button class="grande g-comunes" id="bComunes"><span class="e">🤝</span>COMUNES</button>
   </div>
   <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
 </section>
@@ -112,6 +119,16 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
   <div id="resGuardado" class="bloque"></div>
   <div id="resAvisos" class="bloque"></div>
   <button class="btn" id="resRepetir" hidden>🔄 Volver a ejecutar</button>
+</section>
+
+<!-- COMUNES -->
+<section class="pant" id="pComunes">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>🤝 COMUNES RADAR Y BOT</h2>
+  <p class="sub">Bajistas en el RADAR CAMBIO TENDENCIAS que el BOT COMPRAVENTA tiene en CORTO, y alcistas que tiene en LARGO.</p>
+  <div class="estado" id="comEstado"><div class="spin"></div><span>Cargando…</span></div>
+  <div id="comRes" class="bloque"></div>
+  <button class="btn" id="comRepetir" hidden>🔄 Volver a comprobar</button>
 </section>
 
 <!-- LLAVE -->
@@ -165,7 +182,7 @@ let pantalla = "pInicio", origen = "pInicio";
 function ir(id){
   document.querySelectorAll(".pant").forEach(p => p.classList.toggle("on", p.id === id));
   pantalla = id; window.scrollTo(0,0);
-  if (id !== "pRes") parar();
+  if (id !== "pRes" && id !== "pComunes") parar();
 }
 document.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => ir(b.dataset.ir));
 $("resVolver").onclick = () => ir(origen);
@@ -312,20 +329,25 @@ async function pintaGuardado(v){
   }
 }
 
+async function disparar(wf){
+  const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${wf}/dispatches`, {
+    method:"POST",
+    headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github+json", "Content-Type":"application/json"},
+    body: JSON.stringify({ref:"main", inputs:{prueba:"true"}})
+  });
+  if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error("llave");
+  if (!r.ok) throw new Error("GitHub respondió " + r.status);
+}
+
 async function lanzar(v){
   parar();
   $("resRepetir").hidden = true; $("resAhora").innerHTML = "";
   const t0 = Math.floor(Date.now()/1000) - 5;
   estado("Ejecutando " + v.n + "…");
   try{
-    const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${v.wf}/dispatches`, {
-      method:"POST",
-      headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github+json", "Content-Type":"application/json"},
-      body: JSON.stringify({ref:"main", inputs:{prueba:"true"}})
-    });
-    if (r.status === 401 || r.status === 403 || r.status === 404){ estado("GitHub no acepta la llave guardada. Ponla otra vez en ⚙️", "mal"); return; }
-    if (!r.ok) throw new Error("GitHub respondió " + r.status);
+    await disparar(v.wf);
   }catch(e){
+    if (e.message === "llave"){ estado("GitHub no acepta la llave guardada. Ponla otra vez en ⚙️", "mal"); return; }
     estado("No se pudo ejecutar: " + e.message, "mal"); $("resRepetir").hidden = false; return;
   }
   const inicio = Date.now();
@@ -354,6 +376,98 @@ async function lanzar(v){
 }
 $("resRepetir").onclick = () => actual && lanzar(actual);
 
+// ---------- COMUNES: RADAR CAMBIO TENDENCIAS + BOT COMPRAVENTA ----------
+const V_RADAR = VIG.radar[0], V_BOT = VIG.robot[0];
+const normaliza = t => t.normalize("NFD").replace(/[\u0300-\u036f\u0332]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+// De un mensaje saca cada mercado con su dirección: 1 alcista/LARGO, -1 bajista/CORTO
+function direcciones(msg, tipo){
+  const o = {};
+  (msg || "").split("\n").forEach(l => {
+    const x = l.match(/^\s*([A-Za-zÁÉÍÓÚÑáéíóúñ\/ ]{3,25}):\s*(.+)$/); if (!x) return;
+    const r = x[2].replace(/\u0332/g, "");
+    const d = tipo === "radar" ? (/\bALCISTA\b/.test(r) ? 1 : /\bBAJISTA\b/.test(r) ? -1 : 0)
+                               : (/\bLARGO\b/.test(r) ? 1 : /\bCORTO\b/.test(r) ? -1 : 0);
+    o[normaliza(x[1])] = {nombre: x[1].trim(), d, linea: l.trim()};
+  });
+  return o;
+}
+function pintaComunes(radarMsg, botMsg, etiqueta){
+  const ra = direcciones(radarMsg.message, "radar"), bo = direcciones(botMsg.message, "bot");
+  const baj = [], alc = [];
+  Object.keys(ra).forEach(k => {
+    if (!bo[k] || !ra[k].d || ra[k].d !== bo[k].d) return;
+    const desde = (bo[k].linea.match(/desde el (\d+\/\d+ \d+:\d+)/) || [])[1];
+    const item = {nombre: ra[k].nombre, radar: ra[k].linea.replace(/^[^:]+:\s*/, ""), desde};
+    (ra[k].d === -1 ? baj : alc).push(item);
+  });
+  const fila = (it, cls) => {
+    const sim = simboloTV(it.nombre);
+    return `<div class="lin ${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}" data-tf="${intervaloTV(it.radar)}"` : ""}><b>${esc(it.nombre)}</b> · ${subraya(esc(it.radar))}${it.desde ? `\nBot en ${cls === "b" ? "CORTO" : "LARGO"} desde el ${esc(it.desde)}` : ""}</div>`;
+  };
+  const grupo = (tit, l, cls) => `<div class="grupo ${cls}"><div class="t">${tit} (${l.length})</div>${l.length ? l.map(it => fila(it, cls)).join("") : `<div class="vacio">Ninguno ahora mismo.</div>`}</div>`;
+  $("comRes").innerHTML = `<p class="etq">${etiqueta}</p>`
+    + grupo("🔴 BAJISTAS + CORTO", baj, "b")
+    + grupo("🟢 ALCISTAS + LARGO", alc, "a")
+    + `<p class="nota">Radar: ${hora(radarMsg.time)} (${hace(radarMsg.time)}) · Bot: ${hora(botMsg.time)} (${hace(botMsg.time)})<br>Pulsa un mercado para abrirlo en TradingView.</p>`;
+  return baj.length + alc.length;
+}
+// Último estado (unido) de un vigilante entre unos mensajes
+function ultimoEstado(ms, v){
+  const est = ms.filter(m => deVig(m, v) && esEstado(m));
+  if (!est.length) return null;
+  const ult = est[est.length-1].time;
+  const u = une(est.filter(m => ult - m.time < 180));
+  return u[u.length-1];
+}
+async function comunes(){
+  parar(); actual = "comunes";
+  $("comRes").innerHTML = ""; $("comRepetir").hidden = true;
+  ir("pComunes");
+  estado2("Buscando el último estado del radar y del bot…");
+  try{
+    const ms = await leerNtfy("24h");
+    const r = ultimoEstado(ms, V_RADAR), b = ultimoEstado(ms, V_BOT);
+    if (r && b) pintaComunes(r, b, "Con el último estado guardado");
+  }catch(e){}
+  if (actual !== "comunes") return;
+  if (!store("bolsa_llave")){ estado2("Esto es con lo último guardado. Para comprobarlo al momento, pon tu llave en ⚙️", "mal"); return; }
+  const t0 = Math.floor(Date.now()/1000) - 5;
+  estado2("Ejecutando el radar y el bot…");
+  try{ await Promise.all([disparar(V_RADAR.wf), disparar(V_BOT.wf)]); }
+  catch(e){
+    estado2(e.message === "llave" ? "GitHub no acepta la llave guardada. Ponla otra vez en ⚙️" : "No se pudo ejecutar: " + e.message, "mal");
+    $("comRepetir").hidden = false; return;
+  }
+  const inicio = Date.now();
+  reloj = setInterval(() => {
+    const s = Math.round((Date.now() - inicio)/1000);
+    estado2(`Ejecutando el radar y el bot en GitHub… ${s} s (suele tardar 1-2 min)${s > 150 ? " · GitHub va con cola, sigo esperando" : ""}`);
+  }, 1000);
+  sondeo = setInterval(async () => {
+    if (actual !== "comunes") return parar();
+    try{
+      const ms = await leerNtfy(t0);
+      const nr = ms.filter(m => deVig(m, V_RADAR) && esEstado(m)).length;
+      const nb = ms.filter(m => deVig(m, V_BOT) && esEstado(m)).length;
+      if (nr >= V_RADAR.partes && nb >= V_BOT.partes){
+        parar();
+        const n = pintaComunes(ultimoEstado(ms, V_RADAR), ultimoEstado(ms, V_BOT), "Ahora mismo");
+        estado2(n ? `Hay ${n} mercado${n > 1 ? "s" : ""} en común` : "Ahora mismo no coincide ninguno", "ok");
+        $("comRepetir").hidden = false;
+        if (navigator.vibrate) navigator.vibrate(80);
+        return;
+      }
+    }catch(e){}
+    if (Date.now() - inicio > 6*60*1000){ parar(); estado2("No ha llegado respuesta en 6 minutos. Prueba otra vez.", "mal"); $("comRepetir").hidden = false; }
+  }, 5000);
+}
+function estado2(txt, tipo){
+  const el = $("comEstado"); el.className = "estado" + (tipo ? " " + tipo : "");
+  el.innerHTML = (tipo ? (tipo === "ok" ? "✅" : "⚠️") : '<div class="spin"></div>') + `<span>${txt}</span>`;
+}
+$("bComunes").onclick = comunes;
+$("comRepetir").onclick = comunes;
+
 // ---------- Instalar ----------
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").style.display = "block"; });
@@ -365,7 +479,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-4";
+const APP_VERSION = "2026.10.29-5";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
