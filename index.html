@@ -56,6 +56,8 @@ h2{font-size:19px;margin:0 0 6px;line-height:1.25}
 .lin{font:400 13.5px/1.45 "JetBrains Mono",monospace;padding:6px 8px;border-radius:8px;margin:2px 0;white-space:pre-wrap;word-break:break-word}
 .lin.b{background:rgba(229,72,77,.13);border-left:3px solid var(--rojo)}
 .lin.a{background:rgba(47,191,113,.13);border-left:3px solid var(--verde)}
+.lin.tv{cursor:pointer}
+.lin.tv:active{filter:brightness(1.4)}
 .lin u{text-decoration:underline 2px;text-underline-offset:4px;font-weight:700}
 .vieja{opacity:.75}
 .btn{background:var(--oro);color:#0E1A14;border:0;border-radius:14px;padding:14px 18px;font:900 16px Archivo,sans-serif;cursor:pointer;width:100%;margin-top:6px}
@@ -232,10 +234,24 @@ function hace(ts){
 // Temporalidad que cambió la última: llega entre corchetes [H1.] (o con subrayado Unicode en mensajes viejos) y se pinta subrayada
 const subraya = t => t.replace(/((?:[^\u0332]\u0332)+)/g, x => "<u>" + x.replace(/\u0332/g, "") + "</u>")
                       .replace(/\[((?:M|H|D|W)\d+[+\-.])\]/g, "<u>$1</u>");
+// Pulsar una línea abre ese mercado en TradingView
+const TV_ESP = {"ORO":"OANDA:XAUUSD","PLATA":"OANDA:XAGUSD","PETROLEO WTI":"TVC:USOIL","PETRÓLEO WTI":"TVC:USOIL","PETROLEO":"TVC:USOIL","PETRÓLEO":"TVC:USOIL","WTI":"TVC:USOIL","BITCOIN":"BITSTAMP:BTCUSD"};
+function simboloTV(l){
+  const u = l.toUpperCase();
+  const fx = u.match(/\b([A-Z]{3})\/([A-Z]{3})\b/);
+  if (fx) return "FX:" + fx[1] + fx[2];
+  for (const k of Object.keys(TV_ESP).sort((a,b) => b.length - a.length)) if (u.includes(k)) return TV_ESP[k];
+  return "";
+}
+document.addEventListener("click", e => {
+  const d = e.target.closest(".lin.tv"); if (!d) return;
+  window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(d.dataset.tv), "_blank");
+});
 function tarjeta(m, vieja){
   const lineas = (m.message || "").split("\n").map(l => {
     const cls = /BAJISTA|CORTO|⬇|🔴|baja/i.test(l) ? " b" : /ALCISTA|LARGO|⬆|🟢|sube/i.test(l) ? " a" : "";
-    return l.trim() ? `<div class="lin${cls}">${subraya(esc(l))}</div>` : "";
+    const sim = simboloTV(l);
+    return l.trim() ? `<div class="lin${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}"` : ""}>${subraya(esc(l))}</div>` : "";
   }).join("");
   const tit = (m.title || "").replace(/^VIGILANTE\s+/i, "");
   return `<div class="msg${vieja ? " vieja" : ""}"><div class="t">${esc(tit)}</div>${lineas}<div class="h">${hora(m.time)} · ${hace(m.time)}</div></div>`;
@@ -337,7 +353,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-1";
+const APP_VERSION = "2026.10.29-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
