@@ -76,6 +76,17 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:var(--oro);color:#0E1A14;font-weight:700;padding:12px 18px;border-radius:14px;transition:transform .3s;z-index:9;max-width:90%;text-align:center}
 #toast.show{transform:translateX(-50%) translateY(0)}
 #install{display:none}
+#hoja{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:8}
+#hoja.on{display:flex}
+#hoja .caj{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;width:100%;max-width:620px;padding:18px 16px max(20px,env(safe-area-inset-bottom));animation:sube .2s ease}
+@keyframes sube{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+#hoja h3{margin:0 0 4px;font-size:20px}
+#hoja .sub{margin:0 0 14px}
+.eleg{display:flex;align-items:center;gap:12px;width:100%;border:0;border-radius:16px;padding:18px 16px;margin-bottom:10px;font:900 19px Archivo,sans-serif;cursor:pointer;text-align:left}
+.eleg small{display:block;font:500 13px Archivo,sans-serif;opacity:.8;margin-top:3px}
+.eleg .e{font-size:28px}
+.e-tv{background:var(--azul);color:#0E1A14}
+.e-xtb{background:var(--rojo);color:#fff}
 </style>
 </head>
 <body>
@@ -148,6 +159,15 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 </section>
 
 <footer>BOLSA-LORENCITO · by Lorenzo<br>© <span id="year">2026</span> Lorenzo Moreno Villalba. Todos los derechos reservados.</footer>
+<div id="hoja">
+  <div class="caj">
+    <h3 id="hojaTit"></h3>
+    <p class="sub">¿Dónde lo quieres abrir?</p>
+    <button class="eleg e-tv" id="abreTV"><span class="e">📈</span><span>TradingView<small>Se abre en el gráfico de este mercado</small></span></button>
+    <button class="eleg e-xtb" id="abreXTB"><span class="e">💼</span><span>XTB<small id="xtbSub"></small></span></button>
+    <button class="btn sec" id="hojaCerrar">Cancelar</button>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -272,10 +292,40 @@ function intervaloTV(l){
   if (!max) return "120";
   return max >= 10080 ? "W" : max >= 1440 ? "D" : String(max);
 }
+// Pulsar un mercado: elegir entre TradingView y XTB
+const XTB_ESP = {"XAUUSD":"GOLD","XAGUSD":"SILVER","USOIL":"OIL.WTI","BTCUSD":"BITCOIN"};
+const simboloXTB = tv => { const b = tv.split(":").pop(); return XTB_ESP[b] || b; };
+let elegido = null;
+function cierraHoja(){ $("hoja").classList.remove("on"); elegido = null; }
 document.addEventListener("click", e => {
   const d = e.target.closest(".lin.tv"); if (!d) return;
-  window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(d.dataset.tv) + "&interval=" + (d.dataset.tf || "30"), "_blank");
+  elegido = {tv: d.dataset.tv, tf: d.dataset.tf || "30"};
+  const x = simboloXTB(elegido.tv);
+  $("hojaTit").textContent = x;
+  $("xtbSub").textContent = "Se abre XTB y se copia «" + x + "»: pégalo en el buscador";
+  $("hoja").classList.add("on");
 });
+$("hoja").onclick = e => { if (e.target.id === "hoja") cierraHoja(); };
+$("hojaCerrar").onclick = cierraHoja;
+$("abreTV").onclick = () => {
+  if (!elegido) return;
+  window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(elegido.tv) + "&interval=" + elegido.tf, "_blank");
+  cierraHoja();
+};
+$("abreXTB").onclick = async () => {
+  if (!elegido) return;
+  const x = simboloXTB(elegido.tv);
+  let copiado = false;
+  try{ await navigator.clipboard.writeText(x); copiado = true; }catch(err){}
+  toast(copiado ? "«" + x + "» copiado: pégalo en el buscador de XTB" : "Busca «" + x + "» en XTB", 4000);
+  cierraHoja();
+  const web = "https://xstation5.xtb.com/";
+  setTimeout(() => {
+    if (/Android/i.test(navigator.userAgent))
+      location.href = "intent://#Intent;package=com.xtb.xmobile2;S.browser_fallback_url=" + encodeURIComponent(web) + ";end";
+    else window.open(web, "_blank");
+  }, 300);
+};
 function tarjeta(m, vieja){
   const lineas = (m.message || "").split("\n").map(l => {
     const cls = /BAJISTA|CORTO|⬇|🔴|baja/i.test(l) ? " b" : /ALCISTA|LARGO|⬆|🟢|sube/i.test(l) ? " a" : "";
@@ -408,7 +458,7 @@ function pintaComunes(radarMsg, botMsg, etiqueta){
   $("comRes").innerHTML = `<p class="etq">${etiqueta}</p>`
     + grupo("🔴 BAJISTAS + CORTO", baj, "b")
     + grupo("🟢 ALCISTAS + LARGO", alc, "a")
-    + `<p class="nota">Radar: ${hora(radarMsg.time)} (${hace(radarMsg.time)}) · Bot: ${hora(botMsg.time)} (${hace(botMsg.time)})<br>Pulsa un mercado para abrirlo en TradingView.</p>`;
+    + `<p class="nota">Radar: ${hora(radarMsg.time)} (${hace(radarMsg.time)}) · Bot: ${hora(botMsg.time)} (${hace(botMsg.time)})<br>Pulsa un mercado para abrirlo en TradingView o en XTB.</p>`;
   return baj.length + alc.length;
 }
 // Último estado (unido) de un vigilante entre unos mensajes
@@ -479,7 +529,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-5";
+const APP_VERSION = "2026.10.29-6";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
