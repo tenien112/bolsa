@@ -88,6 +88,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .e-tv{background:var(--azul);color:#0E1A14}
 .e-xtb{background:var(--rojo);color:#fff}
 .e-web{background:#F2F2F2;color:#B3121B}
+.e-ct{background:#1E2A38;color:#fff}
 </style>
 </head>
 <body>
@@ -167,6 +168,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
     <button class="eleg e-tv" id="abreTV"><span class="e">📈</span><span>TradingView<small>Se abre en el gráfico de este mercado</small></span></button>
     <button class="eleg e-web" id="abreXTBWeb"><span class="e">🌐</span><span>XTB en el navegador<small class="xtbSub"></small></span></button>
     <button class="eleg e-xtb" id="abreXTB"><span class="e">📱</span><span>App de XTB<small class="xtbSub"></small></span></button>
+    <button class="eleg e-ct" id="abreCT"><span class="e">📊</span><span>cTrader<small id="ctSub"></small></span></button>
     <button class="btn sec" id="hojaCerrar">Cancelar</button>
   </div>
 </div>
@@ -294,9 +296,10 @@ function intervaloTV(l){
   if (!max) return "120";
   return max >= 10080 ? "W" : max >= 1440 ? "D" : String(max);
 }
-// Pulsar un mercado: elegir entre TradingView, XTB en el navegador o la app de XTB
+// Pulsar un mercado: elegir entre TradingView, XTB en el navegador, la app de XTB o cTrader
 const XTB_ESP = {"XAUUSD":"GOLD","XAGUSD":"SILVER","USOIL":"OIL.WTI","BTCUSD":"BITCOIN"};
 const simboloXTB = tv => { const b = tv.split(":").pop(); return XTB_ESP[b] || b; };
+const simboloCT = tv => tv.split(":").pop();
 let elegido = null;
 function cierraHoja(){ $("hoja").classList.remove("on"); elegido = null; }
 document.addEventListener("click", e => {
@@ -305,6 +308,7 @@ document.addEventListener("click", e => {
   const x = simboloXTB(elegido.tv);
   $("hojaTit").textContent = x;
   document.querySelectorAll(".xtbSub").forEach(el => el.textContent = "Se copia «" + x + "»: pégalo en el buscador");
+  $("ctSub").textContent = "Se copia «" + simboloCT(elegido.tv) + "»: pégalo en el buscador";
   $("hoja").classList.add("on");
 });
 $("hoja").onclick = e => { if (e.target.id === "hoja") cierraHoja(); };
@@ -333,6 +337,17 @@ $("abreXTB").onclick = () => {
   if (/Android/i.test(navigator.userAgent))
     location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.xtb.xmobile2;S.browser_fallback_url=" + encodeURIComponent(tienda) + ";end";
   else window.open("https://xstation5.xtb.com/", "_blank");
+};
+$("abreCT").onclick = () => {
+  if (!elegido) return;
+  const x = simboloCT(elegido.tv);
+  try{ navigator.clipboard.writeText(x).catch(()=>{}); }catch(err){}
+  toast("«" + x + "» copiado: pégalo en el buscador de cTrader", 4000);
+  cierraHoja();
+  const web = "https://app.ctrader.com/";
+  if (/Android/i.test(navigator.userAgent))
+    location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.spotware.ct;S.browser_fallback_url=" + encodeURIComponent(web) + ";end";
+  else window.open(web, "_blank");
 };
 function tarjeta(m, vieja){
   const lineas = (m.message || "").split("\n").map(l => {
@@ -466,7 +481,7 @@ function pintaComunes(radarMsg, botMsg, etiqueta){
   $("comRes").innerHTML = `<p class="etq">${etiqueta}</p>`
     + grupo("🔴 BAJISTAS + CORTO", baj, "b")
     + grupo("🟢 ALCISTAS + LARGO", alc, "a")
-    + `<p class="nota">Radar: ${hora(radarMsg.time)} (${hace(radarMsg.time)}) · Bot: ${hora(botMsg.time)} (${hace(botMsg.time)})<br>Pulsa un mercado para abrirlo en TradingView o en XTB (navegador o app).</p>`;
+    + `<p class="nota">Radar: ${hora(radarMsg.time)} (${hace(radarMsg.time)}) · Bot: ${hora(botMsg.time)} (${hace(botMsg.time)})<br>Pulsa un mercado para abrirlo en TradingView en XTB (navegador o app) o en cTrader.</p>`;
   return baj.length + alc.length;
 }
 // Último estado (unido) de un vigilante entre unos mensajes
@@ -537,7 +552,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-8";
+const APP_VERSION = "2026.10.29-9";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
