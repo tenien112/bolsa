@@ -312,19 +312,17 @@ $("abreTV").onclick = () => {
   window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(elegido.tv) + "&interval=" + elegido.tf, "_blank");
   cierraHoja();
 };
-$("abreXTB").onclick = async () => {
+$("abreXTB").onclick = () => {
   if (!elegido) return;
   const x = simboloXTB(elegido.tv);
-  let copiado = false;
-  try{ await navigator.clipboard.writeText(x); copiado = true; }catch(err){}
-  toast(copiado ? "«" + x + "» copiado: pégalo en el buscador de XTB" : "Busca «" + x + "» en XTB", 4000);
+  // Copiar y abrir en el mismo toque (si se espera, el móvil bloquea abrir la app)
+  try{ navigator.clipboard.writeText(x).catch(()=>{}); }catch(err){}
+  toast("«" + x + "» copiado: pégalo en el buscador de XTB", 4000);
   cierraHoja();
-  const web = "https://xstation5.xtb.com/";
-  setTimeout(() => {
-    if (/Android/i.test(navigator.userAgent))
-      location.href = "intent://#Intent;package=com.xtb.xmobile2;S.browser_fallback_url=" + encodeURIComponent(web) + ";end";
-    else window.open(web, "_blank");
-  }, 300);
+  const tienda = "https://play.google.com/store/apps/details?id=com.xtb.xmobile2";
+  if (/Android/i.test(navigator.userAgent))
+    location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.xtb.xmobile2;S.browser_fallback_url=" + encodeURIComponent(tienda) + ";end";
+  else window.open("https://xstation5.xtb.com/", "_blank");
 };
 function tarjeta(m, vieja){
   const lineas = (m.message || "").split("\n").map(l => {
@@ -529,7 +527,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.29-6";
+const APP_VERSION = "2026.10.29-7";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
