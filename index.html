@@ -65,6 +65,9 @@ h2{font-size:19px;margin:0 0 6px;line-height:1.25}
 .lin.tv{cursor:pointer}
 .lin.tv:active{filter:brightness(1.4)}
 .lin u{text-decoration:underline 2px;text-underline-offset:4px;font-weight:700}
+.lin u.s1{text-decoration-thickness:1px;text-underline-offset:3px}
+.lin u.s2{text-decoration-thickness:3px;text-underline-offset:4px}
+.lin u.s3{text-decoration-thickness:5px;text-underline-offset:5px}
 .vieja{opacity:.75}
 .btn{background:var(--oro);color:#0E1A14;border:0;border-radius:14px;padding:14px 18px;font:900 16px Archivo,sans-serif;cursor:pointer;width:100%;margin-top:6px}
 .btn.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
@@ -273,9 +276,9 @@ function hace(ts){
   const h = Math.floor(s/3600), mi = Math.round((s%3600)/60);
   return "hace " + h + " h" + (mi ? " " + mi + " min" : "");
 }
-// Temporalidad que cambió la última: llega entre corchetes [H1.] (o con subrayado Unicode en mensajes viejos) y se pinta subrayada
+// Subrayado por antigüedad del signo de cada temporalidad: [H1.] la más reciente (fino), [[H1.]] la anterior, [[[H1.]]] la más antigua (grueso)
 const subraya = t => t.replace(/((?:[^\u0332]\u0332)+)/g, x => "<u>" + x.replace(/\u0332/g, "") + "</u>")
-                      .replace(/\[((?:M|H|D|W)\d+[+\-.])\]/g, "<u>$1</u>");
+                      .replace(/(\[+)((?:M|H|D|W)\d+[+\-.])\]+/g, (x, c, tf) => `<u class="s${Math.min(c.length, 3)}">${tf}</u>`);
 // Pulsar una línea abre ese mercado en TradingView
 const TV_ESP = {"ORO":"OANDA:XAUUSD","PLATA":"OANDA:XAGUSD","PETROLEO WTI":"TVC:USOIL","PETRÓLEO WTI":"TVC:USOIL","PETROLEO":"TVC:USOIL","PETRÓLEO":"TVC:USOIL","WTI":"TVC:USOIL","BITCOIN":"BITSTAMP:BTCUSD","PLATINO":"OANDA:XPTUSD","PALADIO":"OANDA:XPDUSD","ETHEREUM":"BITSTAMP:ETHUSD"};
 function simboloTV(l){
@@ -553,7 +556,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.30-2";
+const APP_VERSION = "2026.10.30-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
