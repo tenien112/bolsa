@@ -187,7 +187,7 @@ const VIG = {
     {n:"RADAR CAMBIO TENDENCIAS", d:"Tendencias de los pares de divisas", wf:"vigilante.yml", p:"VIGILANTE RADAR CAMBIO TENDENCIAS", partes:1},
     {n:"COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · metales, petróleo y criptos", wf:"radar-commodities.yml", p:"VIGILANTE COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:1},
     {n:"FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · 16 pares de divisas", wf:"radar-forex.yml", p:"VIGILANTE FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:2},
-    {n:"RADAR M5-M15-M30-H1", d:"5 min, 15 min, 30 min y 1 hora · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-rapido.yml", p:"VIGILANTE RADAR M5-M15-M30-H1", partes:1},
+    {n:"RADAR M15-M30-H1", d:"15 min, 30 min y 1 hora · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-rapido.yml", p:"VIGILANTE RADAR M15-M30-H1", partes:1},
   ]
 };
 
@@ -553,7 +553,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.30-1";
+const APP_VERSION = "2026.10.30-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
