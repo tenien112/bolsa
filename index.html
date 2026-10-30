@@ -192,7 +192,7 @@ const VIG = {
     {n:"RADAR CAMBIO TENDENCIAS", d:"Tendencias de los pares de divisas", wf:"vigilante.yml", p:"VIGILANTE RADAR CAMBIO TENDENCIAS", partes:1},
     {n:"COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · metales, petróleo y criptos", wf:"radar-commodities.yml", p:"VIGILANTE COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:1},
     {n:"FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · 16 pares de divisas", wf:"radar-forex.yml", p:"VIGILANTE FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:2},
-    {n:"RADAR M5-M10-M15-M30-H1-H2-H4", d:"5, 10, 15 y 30 min, 1 h, 2 h y 4 h · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-rapido.yml", p:"VIGILANTE RADAR M5-M10-M15-M30-H1-H2-H4", partes:1},
+    {n:"RADAR M5-M15-M30-H1-H2-H4", d:"5, 15 y 30 min, 1 h, 2 h y 4 h · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-rapido.yml", p:"VIGILANTE RADAR M5-M15-M30-H1-H2-H4", partes:1},
   ]
 };
 
@@ -313,16 +313,20 @@ function simboloTV(l){
   return "";
 }
 function intervaloTV(l){
-  // Siempre la temporalidad más alta que aparezca en la línea (M30, H1, H2, H4, D...); si no hay ninguna, H2
+  // La temporalidad que ha cambiado más recientemente (la de menos corchetes: [H1.]); si hay empate, la más baja.
+  // Si la línea no trae marcas, la temporalidad más alta que aparezca; si no hay ninguna, H2
   const limpio = l.replace(/\u0332/g, "");
-  let max = 0;
-  for (const m of limpio.matchAll(/\b([MHDW])(\d*)[+\-.\]]/g)){
-    const n = parseInt(m[2] || "1", 10);
-    const min = m[1] === "M" ? n : m[1] === "H" ? n * 60 : m[1] === "D" ? n * 1440 : n * 10080;
-    if (min > max) max = min;
+  const aMin = (u, d) => { const n = parseInt(d || "1", 10); return u === "M" ? n : u === "H" ? n * 60 : u === "D" ? n * 1440 : n * 10080; };
+  const fmt = m => m >= 10080 ? "W" : m >= 1440 ? "D" : String(m);
+  let mejor = null;
+  for (const m of limpio.matchAll(/(\[+)([MHDW])(\d*)[+\-.]\]+/g)){
+    const c = m[1].length, min = aMin(m[2], m[3]);
+    if (!mejor || c < mejor.c || (c === mejor.c && min < mejor.min)) mejor = {c, min};
   }
-  if (!max) return "120";
-  return max >= 10080 ? "W" : max >= 1440 ? "D" : String(max);
+  if (mejor) return fmt(mejor.min);
+  let max = 0;
+  for (const m of limpio.matchAll(/\b([MHDW])(\d*)[+\-.\]]/g)){ const min = aMin(m[1], m[2]); if (min > max) max = min; }
+  return max ? fmt(max) : "120";
 }
 // Pulsar un mercado: elegir entre TradingView, XTB en el navegador, la app de XTB o cTrader
 const XTB_ESP = {"XAUUSD":"GOLD","XAGUSD":"SILVER","USOIL":"OIL.WTI","BTCUSD":"BITCOIN","XPTUSD":"PLATINUM","XPDUSD":"PALLADIUM","ETHUSD":"ETHEREUM"};
@@ -580,7 +584,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.30-9";
+const APP_VERSION = "2026.10.30-10";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
