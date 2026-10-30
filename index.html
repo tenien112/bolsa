@@ -68,7 +68,8 @@ h2{font-size:19px;margin:0 0 6px;line-height:1.25}
 .lin u.s1{text-decoration-thickness:5px;text-underline-offset:5px}
 .lin u.s2{text-decoration-thickness:3px;text-underline-offset:4px}
 .lin u.s3{text-decoration-thickness:1px;text-underline-offset:3px}
-.lin svg.fl{vertical-align:middle;margin:0 3px;color:var(--oro)}
+.lin .tfs{position:relative;display:inline-block;padding-top:20px;white-space:pre}
+.lin svg.arc{position:absolute;left:0;top:0;height:20px;color:var(--oro);overflow:visible;pointer-events:none}
 .vieja{opacity:.75}
 .btn{background:var(--oro);color:#0E1A14;border:0;border-radius:14px;padding:14px 18px;font:900 16px Archivo,sans-serif;cursor:pointer;width:100%;margin-top:6px}
 .btn.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
@@ -277,15 +278,30 @@ function hace(ts){
   const h = Math.floor(s/3600), mi = Math.round((s%3600)/60);
   return "hace " + h + " h" + (mi ? " " + mi + " min" : "");
 }
-// Temporalidades ordenadas de la más antigua a la más reciente, con flechas: más fina la que viene de lo antiguo, más gorda la que llega a lo reciente.
 // Marcas del vigilante: [H1.] la más reciente, [[H1.]] la anterior, [[[H1.]]] la más antigua. Subrayado: grueso el más reciente, fino el más antiguo.
-const FLECHA = n => `<svg class="fl f${n}" viewBox="0 0 26 12" width="26" height="12"><path d="M1 6H22M16 1.5L23 6L16 10.5" fill="none" stroke="currentColor" stroke-width="${[4, 2.2, 1.2, 0.8][Math.min(n, 4) - 1]}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// Orden fijo de las temporalidades. Flechas en arco por encima: de la más antigua a la inmediatamente más reciente,
+// más fina la que sale de lo antiguo y más gorda la que llega a lo más reciente. Monoespaciada: 1 carácter = 10 unidades del dibujo.
 const TOK = String.raw`\[+(?:M|H|D|W)\d+[+\-.]\]+`;
-const subraya = t => t.replace(/((?:[^\u0332]\u0332)+)/g, x => "<u>" + x.replace(/\u0332/g, "") + "</u>")
+function arcos(it){
+  let x = 0; it.forEach(o => { o.c = (x + o.tf.length / 2) * 10; x += o.tf.length + 1; });
+  const W = (x - 1) * 10, rangos = [...new Set(it.map(o => o.n))].sort((a, b) => b - a), SX = 0.82;
+  let d = "";
+  for (let i = 1; i < rangos.length; i++){
+    const w = [3.6, 2.2, 1.2, 0.8][Math.min(rangos[i], 4) - 1];
+    for (const o of it.filter(o => o.n === rangos[i - 1])) for (const q of it.filter(o => o.n === rangos[i])){
+      const dr = q.c > o.c ? 1 : -1, x1 = o.c + dr * 10, x2 = q.c - dr * 4, dist = Math.abs(x2 - x1) / 10, cy = 2 - 1.5 * dist, mx = (x1 + x2) / 2;
+      let ux = (x2 - mx) * SX, uy = 18 - cy; const L = Math.hypot(ux, uy); ux /= L; uy /= L;
+      const pt = ang => { const c = Math.cos(ang), s = Math.sin(ang); return `${x2 - 6 * (ux * c - uy * s) / SX} ${18 - 6 * (ux * s + uy * c)}`; };
+      const st = `fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
+      d += `<path d="M${x1} 18Q${mx} ${cy} ${x2} 18" ${st}/><path d="M${pt(0.5)}L${x2} 18L${pt(-0.5)}" ${st}/>`;
+    }
+  }
+  return `<svg class="arc" viewBox="0 0 ${W} 20" preserveAspectRatio="none" style="width:${x - 1}ch">${d}</svg>`;
+}
+const subraya = t => t.replace(/((?:[^̲]̲)+)/g, x => "<u>" + x.replace(/̲/g, "") + "</u>")
   .replace(new RegExp(`${TOK}(?:\\s*(?:→\\s*)?${TOK})*`, "g"), run => {
     const it = [...run.matchAll(/(\[+)((?:M|H|D|W)\d+[+\-.])\]+/g)].map(m => ({n: m[1].length, tf: m[2]}));
-    const rangos = [...new Set(it.map(x => x.n))].sort((a, b) => b - a);
-    return rangos.map((n, i) => (i ? FLECHA(n) : "") + it.filter(x => x.n === n).map(x => `<u class="s${Math.min(n, 3)}">${x.tf}</u>`).join(" ")).join("");
+    return `<span class="tfs">${arcos(it)}${it.map(o => `<u class="s${Math.min(o.n, 3)}">${o.tf}</u>`).join(" ")}</span>`;
   });
 // Pulsar una línea abre ese mercado en TradingView
 const TV_ESP = {"ORO":"OANDA:XAUUSD","PLATA":"OANDA:XAGUSD","PETROLEO WTI":"TVC:USOIL","PETRÓLEO WTI":"TVC:USOIL","PETROLEO":"TVC:USOIL","PETRÓLEO":"TVC:USOIL","WTI":"TVC:USOIL","BITCOIN":"BITSTAMP:BTCUSD","PLATINO":"OANDA:XPTUSD","PALADIO":"OANDA:XPDUSD","ETHEREUM":"BITSTAMP:ETHUSD"};
@@ -564,7 +580,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.30-5";
+const APP_VERSION = "2026.10.30-6";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
