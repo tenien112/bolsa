@@ -68,6 +68,7 @@ h2{font-size:19px;margin:0 0 6px;line-height:1.25}
 .lin u.s1{text-decoration-thickness:5px;text-underline-offset:5px}
 .lin u.s2{text-decoration-thickness:3px;text-underline-offset:4px}
 .lin u.s3{text-decoration-thickness:1px;text-underline-offset:3px}
+.lin svg.fl{vertical-align:middle;margin:0 3px;color:var(--oro)}
 .vieja{opacity:.75}
 .btn{background:var(--oro);color:#0E1A14;border:0;border-radius:14px;padding:14px 18px;font:900 16px Archivo,sans-serif;cursor:pointer;width:100%;margin-top:6px}
 .btn.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
@@ -276,9 +277,16 @@ function hace(ts){
   const h = Math.floor(s/3600), mi = Math.round((s%3600)/60);
   return "hace " + h + " h" + (mi ? " " + mi + " min" : "");
 }
-// Subrayado por antigüedad del signo de cada temporalidad: [H1.] la más reciente (grueso), [[H1.]] la anterior, [[[H1.]]] la más antigua (fino)
+// Temporalidades ordenadas de la más antigua a la más reciente, con flechas: más fina la que viene de lo antiguo, más gorda la que llega a lo reciente.
+// Marcas del vigilante: [H1.] la más reciente, [[H1.]] la anterior, [[[H1.]]] la más antigua. Subrayado: grueso el más reciente, fino el más antiguo.
+const FLECHA = n => `<svg class="fl f${n}" viewBox="0 0 26 12" width="26" height="12"><path d="M1 6H22M16 1.5L23 6L16 10.5" fill="none" stroke="currentColor" stroke-width="${[4, 2.2, 1.2, 0.8][Math.min(n, 4) - 1]}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const TOK = String.raw`\[+(?:M|H|D|W)\d+[+\-.]\]+`;
 const subraya = t => t.replace(/((?:[^\u0332]\u0332)+)/g, x => "<u>" + x.replace(/\u0332/g, "") + "</u>")
-                      .replace(/(\[+)((?:M|H|D|W)\d+[+\-.])\]+/g, (x, c, tf) => `<u class="s${Math.min(c.length, 3)}">${tf}</u>`);
+  .replace(new RegExp(`${TOK}(?:\\s*(?:→\\s*)?${TOK})*`, "g"), run => {
+    const it = [...run.matchAll(/(\[+)((?:M|H|D|W)\d+[+\-.])\]+/g)].map(m => ({n: m[1].length, tf: m[2]}));
+    const rangos = [...new Set(it.map(x => x.n))].sort((a, b) => b - a);
+    return rangos.map((n, i) => (i ? FLECHA(n) : "") + it.filter(x => x.n === n).map(x => `<u class="s${Math.min(n, 3)}">${x.tf}</u>`).join(" ")).join("");
+  });
 // Pulsar una línea abre ese mercado en TradingView
 const TV_ESP = {"ORO":"OANDA:XAUUSD","PLATA":"OANDA:XAGUSD","PETROLEO WTI":"TVC:USOIL","PETRÓLEO WTI":"TVC:USOIL","PETROLEO":"TVC:USOIL","PETRÓLEO":"TVC:USOIL","WTI":"TVC:USOIL","BITCOIN":"BITSTAMP:BTCUSD","PLATINO":"OANDA:XPTUSD","PALADIO":"OANDA:XPDUSD","ETHEREUM":"BITSTAMP:ETHUSD"};
 function simboloTV(l){
@@ -556,7 +564,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.30-4";
+const APP_VERSION = "2026.10.30-5";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
