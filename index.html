@@ -94,6 +94,21 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .e-xtb{background:var(--rojo);color:#fff}
 .e-web{background:#F2F2F2;color:#B3121B}
 .e-ct{background:#1E2A38;color:#fff}
+.e-graf{background:var(--oro);color:#0E1A14}
+.cambio{background:var(--panel2);border:1px solid var(--oro);border-radius:14px;padding:10px 14px;margin:0 0 12px;font:900 24px Archivo,sans-serif;color:var(--oro);text-align:center}
+.cambio small{display:block;font:500 13px Archivo,sans-serif;color:var(--mut);margin-bottom:2px}
+#graf{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;padding:max(12px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom))}
+#graf.on{display:flex}
+#graf .cab{display:flex;align-items:center;gap:8px}
+#graf h3{flex:1;margin:0;font-size:18px;line-height:1.25}
+#graf h3 small{display:block;color:var(--oro);font-size:14px}
+#gTfs{display:flex;gap:4px;margin:8px 0}
+#gTfs button{flex:1;min-width:0;padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:700 13px "JetBrains Mono",monospace;cursor:pointer}
+#gTfs button.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
+#gCaja{position:relative;flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+#gLinea{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--oro);pointer-events:none;z-index:5;display:none}
+#gEtq{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
+#gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 </style>
 </head>
 <body>
@@ -170,13 +185,21 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 <div id="hoja">
   <div class="caj">
     <h3 id="hojaTit"></h3>
+    <div class="cambio" id="hojaCambio"></div>
     <p class="sub">¿Dónde lo quieres abrir?</p>
+    <button class="eleg e-graf" id="abreGraf"><span class="e">📍</span><span>Gráfico con la línea del cambio<small id="grafSub">Aquí en la app, con una línea en la hora exacta</small></span></button>
     <button class="eleg e-tv" id="abreTV"><span class="e">📈</span><span>TradingView<small>Se abre en el gráfico de este mercado</small></span></button>
     <button class="eleg e-web" id="abreXTBWeb"><span class="e">🌐</span><span>XTB en el navegador<small class="xtbSub"></small></span></button>
     <button class="eleg e-xtb" id="abreXTB"><span class="e">📱</span><span>App de XTB<small class="xtbSub"></small></span></button>
     <button class="eleg e-ct" id="abreCT"><span class="e">📊</span><span>cTrader<small id="ctSub"></small></span></button>
     <button class="btn sec" id="hojaCerrar">Cancelar</button>
   </div>
+</div>
+<div id="graf">
+  <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
+  <div id="gTfs"></div>
+  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div></div>
+  <p id="gNota"></p>
 </div>
 <div id="toast"></div>
 
@@ -339,9 +362,12 @@ let elegido = null;
 function cierraHoja(){ $("hoja").classList.remove("on"); elegido = null; }
 document.addEventListener("click", e => {
   const d = e.target.closest(".lin.tv"); if (!d) return;
-  elegido = {tv: d.dataset.tv, tf: d.dataset.tf || "30"};
+  elegido = {tv: d.dataset.tv, tf: d.dataset.tf || "30", cambio: d.dataset.cambio || ""};
   const x = simboloXTB(elegido.tv);
   $("hojaTit").textContent = x;
+  $("hojaCambio").innerHTML = elegido.cambio
+    ? `<small>Último cambio (en ${nombreTF(elegido.tf)})</small>🕒 ${elegido.cambio}`
+    : `<small>Último cambio</small>Sin hora en esta línea`;
   document.querySelectorAll(".xtbSub").forEach(el => el.textContent = "Se copia «" + x + "»: pégalo en el buscador");
   $("ctSub").textContent = "Se copia «" + simboloCT(elegido.tv) + "»: pégalo en el buscador";
   $("hoja").classList.add("on");
@@ -384,11 +410,134 @@ $("abreCT").onclick = () => {
     location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.spotware.ct;S.browser_fallback_url=" + encodeURIComponent(web) + ";end";
   else window.open(web, "_blank");
 };
+// ---------- Gráfico propio con la línea vertical del último cambio ----------
+// Hora del cambio que trae la línea (la primera «dd/mm hh:mm», hora de Madrid)
+function horaCambio(l){
+  const m = (l || "").replace(/̲/g, "").match(/\b(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{2})\b/);
+  return m ? `${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")} ${m[3].padStart(2,"0")}:${m[4]}` : "";
+}
+const TF_NOM = {"5":"M5","15":"M15","30":"M30","60":"H1","120":"H2","240":"H4","480":"H8"};
+const nombreTF = tf => TF_NOM[tf] || (tf === "D" ? "D1" : tf === "W" ? "W1" : "M" + tf);
+let LW = null;
+function cargaLW(){
+  if (LW) return LW;
+  LW = new Promise((ok, mal) => {
+    const sc = document.createElement("script");
+    sc.src = "https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js";
+    sc.onload = () => ok(window.LightweightCharts); sc.onerror = () => { LW = null; mal(new Error("libreria")); };
+    document.head.appendChild(sc);
+  });
+  return LW;
+}
+// Las velas se dibujan en hora de Madrid (la librería pinta las horas tal cual)
+const fMad = new Intl.DateTimeFormat("en-GB", {timeZone:"Europe/Madrid", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hourCycle:"h23"});
+function aMadrid(t){
+  const p = {}; fMad.formatToParts(new Date(t*1000)).forEach(x => p[x.type] = x.value);
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute) / 1000;
+}
+function cambioASeg(txt){
+  const m = (txt || "").match(/(\d{2})\/(\d{2}) (\d{2}):(\d{2})/); if (!m) return null;
+  const hoy = new Date(); let y = hoy.getFullYear();
+  let t = Date.UTC(y, +m[2] - 1, +m[1], +m[3], +m[4]) / 1000;
+  if (t > aMadrid(Date.now()/1000) + 86400) t = Date.UTC(y - 1, +m[2] - 1, +m[1], +m[3], +m[4]) / 1000;
+  return t;
+}
+const velasCache = {};
+async function leeVelas(sim){
+  const c = velasCache[sim];
+  if (c && Date.now() - c.leido < 60000) return c.datos;
+  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/velas/${sim}.json?t=${Date.now()}`, {
+    headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github.raw+json"}, cache:"no-store"});
+  if (r.status === 404) throw new Error("sinvelas");
+  if (r.status === 401 || r.status === 403) throw new Error("llave");
+  if (!r.ok) throw new Error("GitHub respondió " + r.status);
+  const datos = await r.json();
+  velasCache[sim] = {leido: Date.now(), datos};
+  return datos;
+}
+let G = null;   // {chart, serie, velas, tCambio, tf}
+function cierraGraf(){
+  $("graf").classList.remove("on");
+  if (G && G.chart) G.chart.remove();
+  G = null; $("gLinea").style.display = "none";
+}
+function colocaLinea(){
+  if (!G || G.iCambio == null) { $("gLinea").style.display = "none"; return; }
+  const ts = G.chart.timeScale(), b = Math.floor(G.iCambio), f = G.iCambio - b;
+  const x0 = ts.logicalToCoordinate(b), x1 = ts.logicalToCoordinate(b + 1);
+  const x = x0 == null || x1 == null ? null : x0 + f * (x1 - x0);
+  const ancho = $("gCaja").clientWidth - G.chart.priceScale("right").width();
+  if (x == null || x < 0 || x > ancho) { $("gLinea").style.display = "none"; return; }
+  $("gLinea").style.left = x + "px"; $("gLinea").style.display = "block";
+}
+async function abreGraf(sim, tf, cambio, titulo){
+  cierraGraf();
+  if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
+  $("graf").classList.add("on");
+  $("gTit").innerHTML = `${esc(titulo)}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : "Sin hora de cambio en esta línea"}</small>`;
+  $("gTfs").innerHTML = Object.keys(TF_NOM).map(k => `<button data-tf="${k}" class="${k === tf ? "on" : ""}">${TF_NOM[k]}</button>`).join("");
+  $("gTfs").querySelectorAll("button").forEach(b => b.onclick = () => abreGraf(sim, b.dataset.tf, cambio, titulo));
+  $("gNota").textContent = "Cargando velas…";
+  let L, datos;
+  try { [L, datos] = await Promise.all([cargaLW(), leeVelas(sim)]); }
+  catch(e){
+    $("gNota").textContent = e.message === "llave" ? "GitHub no acepta la llave guardada. Ponla otra vez en ⚙️"
+      : e.message === "sinvelas" ? "Todavía no hay velas guardadas de este mercado. Ejecuta cualquier radar desde la app y vuelve a probar en un par de minutos."
+      : e.message === "libreria" ? "No se ha podido cargar el gráfico (¿sin conexión?)." : "No se han podido leer las velas: " + e.message;
+    return;
+  }
+  if (!$("graf").classList.contains("on")) return;
+  if (!TF_NOM[tf]) tf = "240";
+  const crudas = (datos.tf || {})[tf] || [];
+  const velas = []; let ant = -Infinity;
+  for (const v of crudas){ const t = aMadrid(v[0]); if (t <= ant) continue; ant = t; velas.push({time:t, open:v[1], high:v[2], low:v[3], close:v[4]}); }
+  if (!velas.length){ $("gNota").textContent = "No hay velas de " + nombreTF(tf) + " para este mercado."; return; }
+  const ultimo = velas[velas.length - 1].close;
+  const dec = ultimo < 10 ? 5 : ultimo < 300 ? 3 : 2;
+  const chart = L.createChart($("gCaja"), {
+    autoSize: true,
+    layout: {background: {color: "#0E1A14"}, textColor: "#E8F1EA", fontFamily: "JetBrains Mono, monospace"},
+    grid: {vertLines: {color: "#1C3125"}, horzLines: {color: "#1C3125"}},
+    rightPriceScale: {borderColor: "#2A4234"},
+    timeScale: {borderColor: "#2A4234", timeVisible: true, secondsVisible: false, rightOffset: 4},
+    localization: {locale: "es-ES"},
+    crosshair: {mode: 0}
+  });
+  const serie = chart.addCandlestickSeries({upColor:"#2FBF71", downColor:"#E5484D", borderVisible:false, wickUpColor:"#2FBF71", wickDownColor:"#E5484D",
+    priceFormat: {type:"price", precision: dec, minMove: Math.pow(10, -dec)}});
+  serie.setData(velas);
+  G = {chart, serie, iCambio: null};
+  const tC = cambioASeg(cambio), dur = (+tf) * 60, n = velas.length;
+  let nota = `Velas de ${nombreTF(tf)} en hora de Madrid · guardadas ${hace(datos.actualizado)}.`;
+  if (tC != null){
+    let i = -1; for (let k = 0; k < n; k++){ if (velas[k].time <= tC) i = k; else break; }
+    if (i < 0) nota += " El cambio es anterior a estas velas: pulsa una temporalidad mayor.";
+    else {
+      G.iCambio = i + Math.min(1, (tC - velas[i].time) / dur) - 0.5;   // en el punto exacto de la hora del cambio
+      $("gEtq").textContent = cambio;
+      const pasado = tC > velas[n-1].time + dur;
+      if (pasado) nota += " El cambio es posterior a la última vela guardada: vuelve a ejecutar el radar para actualizarlas.";
+      chart.timeScale().setVisibleLogicalRange({from: Math.max(0, Math.min(i - 25, n - 90)), to: n + 4});
+    }
+  }
+  if (G.iCambio == null) chart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - 90), to: n + 4});
+  $("gNota").textContent = nota + " Desliza para moverte y pellizca para ampliar.";
+  chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
+  new ResizeObserver(colocaLinea).observe($("gCaja"));
+  setTimeout(colocaLinea, 50);
+}
+$("gCerrar").onclick = cierraGraf;
+$("abreGraf").onclick = () => {
+  if (!elegido) return;
+  const e = elegido; cierraHoja();
+  abreGraf(simboloCT(e.tv), TF_NOM[e.tf] ? e.tf : "240", e.cambio, simboloXTB(e.tv) + " · " + nombreTF(TF_NOM[e.tf] ? e.tf : "240"));
+};
+
 function tarjeta(m, vieja){
   const lineas = (m.message || "").split("\n").map(l => {
     const cls = /BAJISTA|CORTO|⬇|🔴|baja/i.test(l) ? " b" : /ALCISTA|LARGO|⬆|🟢|sube/i.test(l) ? " a" : "";
     const sim = simboloTV(l), tfm = intervaloTV(l);
-    return l.trim() ? `<div class="lin${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}" data-tf="${tfm}"` : ""}>${subraya(esc(l))}</div>` : "";
+    return l.trim() ? `<div class="lin${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}" data-tf="${tfm}" data-cambio="${horaCambio(l)}"` : ""}>${subraya(esc(l))}</div>` : "";
   }).join("");
   const tit = (m.title || "").replace(/^VIGILANTE\s+/i, "");
   return `<div class="msg${vieja ? " vieja" : ""}"><div class="t">${esc(tit)}</div>${lineas}<div class="h">${hora(m.time)} · ${hace(m.time)}</div></div>`;
@@ -511,7 +660,7 @@ function pintaComunes(radarMsg, botMsg, etiqueta){
   });
   const fila = (it, cls) => {
     const sim = simboloTV(it.nombre);
-    return `<div class="lin ${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}" data-tf="${intervaloTV(it.radar)}"` : ""}><b>${esc(it.nombre)}</b> · ${subraya(esc(it.radar))}${it.desde ? `\nBot en ${cls === "b" ? "CORTO" : "LARGO"} desde el ${esc(it.desde)}` : ""}</div>`;
+    return `<div class="lin ${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}" data-tf="${intervaloTV(it.radar)}" data-cambio="${horaCambio(it.radar)}"` : ""}><b>${esc(it.nombre)}</b> · ${subraya(esc(it.radar))}${it.desde ? `\nBot en ${cls === "b" ? "CORTO" : "LARGO"} desde el ${esc(it.desde)}` : ""}</div>`;
   };
   const grupo = (tit, l, cls) => `<div class="grupo ${cls}"><div class="t">${tit} (${l.length})</div>${l.length ? l.map(it => fila(it, cls)).join("") : `<div class="vacio">Ninguno ahora mismo.</div>`}</div>`;
   $("comRes").innerHTML = `<p class="etq">${etiqueta}</p>`
@@ -592,7 +741,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-2";
+const APP_VERSION = "2026.10.31-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
