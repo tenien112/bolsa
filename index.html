@@ -64,6 +64,10 @@ h2{font-size:19px;margin:0 0 6px;line-height:1.25}
 .lin.a{background:rgba(47,191,113,.13);border-left:3px solid var(--verde)}
 .lin.tv{cursor:pointer}
 .lin.tv:active{filter:brightness(1.4)}
+.lin.visto{outline:2px solid var(--oro);outline-offset:-1px}
+.lin.visto::before{content:"★ ";color:var(--oro);font-weight:700}
+.lin.destello{animation:destello 1.4s ease 2}
+@keyframes destello{50%{background:rgba(245,196,81,.35)}}
 .lin u{text-decoration:underline 2px;text-underline-offset:4px;font-weight:700}
 .lin u.s1{text-decoration-thickness:5px;text-underline-offset:5px}
 .lin u.s2{text-decoration-thickness:3px;text-underline-offset:4px}
@@ -374,8 +378,10 @@ document.addEventListener("click", e => {
 });
 $("hoja").onclick = e => { if (e.target.id === "hoja") cierraHoja(); };
 $("hojaCerrar").onclick = cierraHoja;
+function marcaAlSalir(){ if (elegido){ marcaVisto(elegido.tv); pendienteVolver = elegido.tv; } }
 $("abreTV").onclick = () => {
   if (!elegido) return;
+  marcaAlSalir();
   window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(elegido.tv) + "&interval=" + elegido.tf, "_blank");
   cierraHoja();
 };
@@ -388,11 +394,13 @@ function copiaXTB(){
 }
 $("abreXTBWeb").onclick = () => {
   if (!elegido) return;
+  marcaAlSalir();
   copiaXTB();
   window.open("https://xstation5.xtb.com/", "_blank");
 };
 $("abreXTB").onclick = () => {
   if (!elegido) return;
+  marcaAlSalir();
   copiaXTB();
   const tienda = "https://play.google.com/store/apps/details?id=com.xtb.xmobile2";
   if (/Android/i.test(navigator.userAgent))
@@ -401,6 +409,7 @@ $("abreXTB").onclick = () => {
 };
 $("abreCT").onclick = () => {
   if (!elegido) return;
+  marcaAlSalir();
   const x = simboloCT(elegido.tv);
   try{ navigator.clipboard.writeText(x).catch(()=>{}); }catch(err){}
   toast("«" + x + "» copiado: pégalo en el buscador de cTrader", 4000);
@@ -410,6 +419,31 @@ $("abreCT").onclick = () => {
     location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.spotware.ct;S.browser_fallback_url=" + encodeURIComponent(web) + ";end";
   else window.open(web, "_blank");
 };
+// ---------- Mercados ya consultados: estrella y volver a ellos ----------
+const hoyTxt = () => new Date().toLocaleDateString("es-ES");
+let vistos = (() => { const v = store("bolsa_vistos"); return v && v.dia === hoyTxt() ? v.l : []; })();
+let pendienteVolver = null;
+function pintaVistos(){
+  document.querySelectorAll(".lin.tv").forEach(el => el.classList.toggle("visto", vistos.includes(el.dataset.tv)));
+}
+function marcaVisto(sim){
+  if (!sim) return;
+  if (!vistos.includes(sim)) vistos.push(sim);
+  store("bolsa_vistos", {dia: hoyTxt(), l: vistos});
+  pintaVistos();
+}
+function irAlVisto(sim){
+  const el = [...document.querySelectorAll(".lin.tv")].find(x => x.dataset.tv === sim && x.offsetParent !== null);
+  if (!el) return;
+  el.scrollIntoView({behavior: "smooth", block: "center"});
+  el.classList.remove("destello"); void el.offsetWidth; el.classList.add("destello");
+}
+new MutationObserver(pintaVistos).observe(document.body, {childList: true, subtree: true});
+// Al volver de TradingView, XTB o cTrader, llevar al mercado consultado
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && pendienteVolver){ const s = pendienteVolver; pendienteVolver = null; setTimeout(() => irAlVisto(s), 300); }
+});
+
 // ---------- Gráfico propio con la línea vertical del último cambio ----------
 // Hora del cambio que trae la línea (la primera «dd/mm hh:mm», hora de Madrid)
 function horaCambio(l){
@@ -455,9 +489,12 @@ async function leeVelas(sim){
   velasCache[sim] = {leido: Date.now(), datos};
   return datos;
 }
-let G = null;   // {chart, serie, velas, tCambio, tf}
+let G = null;   // {chart, serie, iCambio}
+let simGraf = null, simTV = null;   // mercado del gráfico abierto
 function cierraGraf(){
+  const abierto = $("graf").classList.contains("on");
   $("graf").classList.remove("on");
+  if (abierto && simTV){ const x = simTV; marcaVisto(x); setTimeout(() => irAlVisto(x), 50); }
   if (G && G.chart) G.chart.remove();
   G = null; $("gLinea").style.display = "none";
 }
@@ -471,7 +508,9 @@ function colocaLinea(){
   $("gLinea").style.left = x + "px"; $("gLinea").style.display = "block";
 }
 async function abreGraf(sim, tf, cambio, titulo){
-  cierraGraf();
+  if (G && G.chart) G.chart.remove();
+  G = null; $("gLinea").style.display = "none";
+  simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
   $("gTit").innerHTML = `${esc(titulo)}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : "Sin hora de cambio en esta línea"}</small>`;
@@ -530,6 +569,7 @@ $("gCerrar").onclick = cierraGraf;
 $("abreGraf").onclick = () => {
   if (!elegido) return;
   const e = elegido; cierraHoja();
+  simTV = e.tv;
   abreGraf(simboloCT(e.tv), TF_NOM[e.tf] ? e.tf : "240", e.cambio, simboloXTB(e.tv) + " · " + nombreTF(TF_NOM[e.tf] ? e.tf : "240"));
 };
 
@@ -741,7 +781,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-3";
+const APP_VERSION = "2026.10.31-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
