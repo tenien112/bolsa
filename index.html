@@ -125,6 +125,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gRadar u.s3{text-decoration-thickness:1px;text-underline-offset:3px}
 #gRadar b.a{color:#0E1A14;background:#2FBF71;border-radius:5px;padding:0 5px}#gRadar b.b{color:#fff;background:#E5484D;border-radius:5px;padding:0 5px}
 #gAuto{position:absolute;right:4px;bottom:32px;z-index:7;font:700 12px "JetBrains Mono",monospace;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
+#gMacd{position:absolute;right:4px;bottom:66px;z-index:7;font:700 12px "JetBrains Mono",monospace;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
+#gMacd.on{background:#4DA3FF;color:#0E1A14;border-color:#4DA3FF}
 #gAuto.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 </style>
@@ -216,7 +218,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 <div id="graf">
   <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
   <div id="gTfs"></div>
-  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button></div>
+  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button></div>
   <p id="gNota"></p>
 </div>
 <div id="toast"></div>
@@ -675,19 +677,25 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   const serie = chart.addCandlestickSeries({upColor:"#2FBF71", downColor:"#E5484D", borderVisible:false, wickUpColor:"#2FBF71", wickDownColor:"#E5484D",
     priceFormat: {type:"price", precision: dec, minMove: Math.pow(10, -dec)}});
   serie.setData(velas);
-  // MACD (12, 26, 9) encima de las velas, en el mismo gráfico, con su propia escala (invisible)
-  serie.priceScale().applyOptions({scaleMargins: {top: 0.05, bottom: 0.05}});
-  const m = calculaMACD(velas.map(v => v.close));
+  // MACD (12, 26, 9) en la parte de abajo del gráfico, con su propia escala. Botón MACD para quitarlo o ponerlo (se guarda)
+    const m = calculaMACD(velas.map(v => v.close));
   const sM = {priceScaleId: "macd", priceFormat: {type: "price", precision: dec + 1, minMove: Math.pow(10, -(dec + 1))}, lastValueVisible: false, priceLineVisible: false};
   const hist = chart.addHistogramSeries(sM);
   const lMacd = chart.addLineSeries({...sM, color: "#4DA3FF", lineWidth: 2, title: "MACD"});
   const lSen = chart.addLineSeries({...sM, color: "#FF9F1C", lineWidth: 2, title: "Señal"});
-  chart.priceScale("macd").applyOptions({scaleMargins: {top: 0.05, bottom: 0.05}, visible: false});
+  chart.priceScale("macd").applyOptions({scaleMargins: {top: 0.75, bottom: 0.02}, borderColor: "#2A4234"});
   const pts = (arr, f) => velas.map((v, k) => arr[k] == null ? {time: v.time} : f(arr[k], k, v.time));
   hist.setData(pts(m.h, (x, k) => ({time: velas[k].time, value: x,
-    color: x >= 0 ? (k && m.h[k-1] != null && x < m.h[k-1] ? "rgba(47,191,113,.18)" : "rgba(47,191,113,.35)") : (k && m.h[k-1] != null && x > m.h[k-1] ? "rgba(229,72,77,.18)" : "rgba(229,72,77,.35)")})));
+    color: x >= 0 ? (k && m.h[k-1] != null && x < m.h[k-1] ? "#1F7A4A" : "#2FBF71") : (k && m.h[k-1] != null && x > m.h[k-1] ? "#8E2E31" : "#E5484D")})));
   lMacd.setData(pts(m.macd, (x, k, t) => ({time: t, value: x})));
   lSen.setData(pts(m.sen, (x, k, t) => ({time: t, value: x})));
+  const ponMACD = on => {
+    [hist, lMacd, lSen].forEach(x => x.applyOptions({visible: on}));
+    serie.priceScale().applyOptions({scaleMargins: {top: 0.05, bottom: on ? 0.3 : 0.05}});
+    $("gMacd").classList.toggle("on", on);
+  };
+  ponMACD(store("bolsa_macd") !== false);
+  $("gMacd").onclick = () => { const on = !$("gMacd").classList.contains("on"); store("bolsa_macd", on); ponMACD(on); };
   // Botón AUTO (como en TradingView): ajusta el alto de las velas a lo que se ve. Se guarda la elección
   const pintaAuto = () => $("gAuto").classList.toggle("on", !!chart.priceScale("right").options().autoScale);
   chart.priceScale("right").applyOptions({autoScale: store("bolsa_auto") !== false});
@@ -725,7 +733,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
     }
   }
   if (G.iCambio == null) chart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - 90), to: n + 4});
-  $("gNota").textContent = nota + " Encima de las velas, el MACD (12, 26, 9): azul MACD, naranja señal. Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
+  $("gNota").textContent = nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -946,7 +954,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-12";
+const APP_VERSION = "2026.10.31-13";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
