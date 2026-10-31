@@ -364,6 +364,14 @@ const simboloXTB = tv => { const b = tv.split(":").pop(); return XTB_ESP[b] || b
 const simboloCT = tv => tv.split(":").pop();
 let elegido = null;
 function cierraHoja(){ $("hoja").classList.remove("on"); elegido = null; }
+// Botón «atrás» del móvil: cierra la hoja o el gráfico en vez de salir de la app
+const hayCapa = () => !!(history.state && history.state.capa);
+function abreCapa(){ if (!hayCapa()) history.pushState({capa: 1}, ""); }
+function cierraCapa(){ if (hayCapa()) history.back(); }
+window.addEventListener("popstate", () => {
+  if ($("graf").classList.contains("on")) cierraGraf();
+  if ($("hoja").classList.contains("on")) cierraHoja();
+});
 document.addEventListener("click", e => {
   const d = e.target.closest(".lin.tv"); if (!d) return;
   elegido = {tv: d.dataset.tv, tf: d.dataset.tf || "30", cambio: d.dataset.cambio || ""};
@@ -375,15 +383,16 @@ document.addEventListener("click", e => {
   document.querySelectorAll(".xtbSub").forEach(el => el.textContent = "Se copia «" + x + "»: pégalo en el buscador");
   $("ctSub").textContent = "Se copia «" + simboloCT(elegido.tv) + "»: pégalo en el buscador";
   $("hoja").classList.add("on");
+  abreCapa();
 });
-$("hoja").onclick = e => { if (e.target.id === "hoja") cierraHoja(); };
-$("hojaCerrar").onclick = cierraHoja;
+$("hoja").onclick = e => { if (e.target.id === "hoja"){ cierraHoja(); cierraCapa(); } };
+$("hojaCerrar").onclick = () => { cierraHoja(); cierraCapa(); };
 function marcaAlSalir(){ if (elegido){ marcaVisto(elegido.tv); pendienteVolver = elegido.tv; } }
 $("abreTV").onclick = () => {
   if (!elegido) return;
   marcaAlSalir();
   window.open("https://es.tradingview.com/chart/?symbol=" + encodeURIComponent(elegido.tv) + "&interval=" + elegido.tf, "_blank");
-  cierraHoja();
+  cierraHoja(); cierraCapa();
 };
 function copiaXTB(){
   const x = simboloXTB(elegido.tv);
@@ -565,10 +574,10 @@ async function abreGraf(sim, tf, cambio, titulo){
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
 }
-$("gCerrar").onclick = cierraGraf;
+$("gCerrar").onclick = () => { cierraGraf(); cierraCapa(); };
 $("abreGraf").onclick = () => {
   if (!elegido) return;
-  const e = elegido; cierraHoja();
+  const e = elegido; cierraHoja(); abreCapa();   // la hoja deja su sitio en el historial al gráfico
   simTV = e.tv;
   abreGraf(simboloCT(e.tv), TF_NOM[e.tf] ? e.tf : "240", e.cambio, simboloXTB(e.tv) + " · " + nombreTF(TF_NOM[e.tf] ? e.tf : "240"));
 };
@@ -781,7 +790,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-4";
+const APP_VERSION = "2026.10.31-5";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
