@@ -114,9 +114,15 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gCaja{position:relative;flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 #gLinea{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--oro);pointer-events:none;z-index:5;display:none}
 #gEtq{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
-#gRadar{position:absolute;bottom:34px;left:6px;right:70px;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
+#gRadar{position:absolute;bottom:34px;left:6px;max-width:calc(100% - 12px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
 #gRadar small{display:block;color:var(--mut);font-size:12px;font-weight:400}
 #gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
+#gRadar .tfs{position:relative;display:inline-block;padding-top:20px;white-space:pre}
+#gRadar svg.arc{position:absolute;left:0;top:0;height:20px;color:var(--oro);overflow:visible;pointer-events:none}
+#gRadar u{text-decoration-color:currentColor}
+#gRadar u.s1{text-decoration-thickness:5px;text-underline-offset:5px}
+#gRadar u.s2{text-decoration-thickness:3px;text-underline-offset:4px}
+#gRadar u.s3{text-decoration-thickness:1px;text-underline-offset:3px}
 #gRadar b.a{color:#0E1A14;background:#2FBF71;border-radius:5px;padding:0 5px}#gRadar b.b{color:#fff;background:#E5484D;border-radius:5px;padding:0 5px}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 </style>
@@ -578,11 +584,12 @@ function colocaLinea(){
 // Cómo estaba el radar al cierre de la vela que se toca con el dedo
 function estadoEn(lista, t){
   // lista = [[hora de cierre, estado], ...] ordenada: el último cambio anterior o igual a t
+  // Devuelve {e: estado, d: desde cuándo tiene ese estado}
   let a = 0, b = (lista || []).length - 1, r = null;
-  while (a <= b){ const m = (a + b) >> 1; if (lista[m][0] <= t){ r = lista[m][1]; a = m + 1; } else b = m - 1; }
+  while (a <= b){ const m = (a + b) >> 1; if (lista[m][0] <= t){ r = {e: lista[m][1], d: lista[m][0]}; a = m + 1; } else b = m - 1; }
   return r;
 }
-function pintaRadar(tVela){
+function pintaRadar(tVela, xDedo){
   const caja = $("gRadar");
   if (!G || tVela == null || !G.orig.has(tVela)) return;
   const fin = G.orig.get(tVela) + G.dur;          // cierre de la vela (UTC)
@@ -591,12 +598,24 @@ function pintaRadar(tVela){
   const f = new Date(tVela * 1000), dd = n => String(n).padStart(2, "0");
   const cuando = `${dd(f.getUTCDate())}/${dd(f.getUTCMonth()+1)} ${dd(f.getUTCHours())}:${dd(f.getUTCMinutes())}`;
   if (!radar){ caja.innerHTML = `<small>Vela ${cuando}</small>Aún no hay historial del radar: ejecuta cualquier radar desde la app y vuelve en un par de minutos.`; caja.style.display = "block"; return; }
-  const es = G.tfs.map(tf => ({tf, e: estadoEn(radar[String(TF_MIN[tf])], ahora)}));
-  const txt = es.map(o => o.e == null ? `<span class="z">${o.tf}?</span>` : `<span class="${o.e > 0 ? "p" : o.e < 0 ? "n" : "z"}">${o.tf}${o.e > 0 ? "+" : o.e < 0 ? "-" : "."}</span>`).join(" ");
+  const es = G.tfs.map(tf => { const r = estadoEn(radar[String(TF_MIN[tf])], ahora); return {tf, e: r ? r.e : null, d: r ? r.d : null}; });
+  // Igual que en los radares: subrayado y flechas según el orden en que cambió cada temporalidad (1 = la más reciente)
+  const inicios = [...new Set(es.filter(o => o.d != null).map(o => o.d))].sort((x, y) => y - x);
+  const sg = e => e > 0 ? "+" : e < 0 ? "-" : ".";
+  let txt;
+  if (es.every(o => o.e != null)){
+    const marcas = es.map(o => { const n = inicios.indexOf(o.d) + 1; return "[".repeat(n) + o.tf + sg(o.e) + "]".repeat(n); }).join(" ");
+    txt = subraya(marcas).replace(/<u class="(s\d)">([^<]*?)([+\-.])<\/u>/g, (m, c, tf, x) => `<u class="${c} ${x === "+" ? "p" : x === "-" ? "n" : "z"}">${tf}${x}</u>`);
+  } else txt = es.map(o => o.e == null ? `<span class="z">${o.tf}?</span>` : `<span class="${o.e > 0 ? "p" : o.e < 0 ? "n" : "z"}">${o.tf}${sg(o.e)}</span>`).join(" ");
   const todos = es.length && es.every(o => o.e === es[0].e) ? es[0].e : 0;
   const g = todos > 0 ? ' <b class="a">ALCISTA</b>' : todos < 0 ? ' <b class="b">BAJISTA</b>' : "";
   caja.innerHTML = `<small>Radar al cierre de la vela ${cuando} (${nombreTF(G.tf)})</small>${txt}${g}`;
   caja.style.display = "block";
+  // El recuadro se coloca junto a la vela tocada
+  if (xDedo != null){
+    const ancho = $("gCaja").clientWidth, w = caja.offsetWidth;
+    caja.style.left = Math.max(4, Math.min(ancho - w - 4, xDedo - w / 2)) + "px";
+  }
 }
 async function abreGraf(sim, tf, cambio, titulo, tfs){
   if (G && G.chart) G.chart.remove();
@@ -639,8 +658,8 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   G = {chart, serie, iCambio: null, orig, dur: (+tf) * 60, tf, datos,
        tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
   // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
-  chart.subscribeCrosshairMove(p => { if (p && p.time != null) pintaRadar(p.time); });
-  chart.subscribeClick(p => { if (p && p.time != null) pintaRadar(p.time); });
+  chart.subscribeCrosshairMove(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
+  chart.subscribeClick(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
   const tC = cambioASeg(cambio), dur = (+tf) * 60, n = velas.length;
   let nota = `Velas de ${nombreTF(tf)} en hora de Madrid · guardadas ${hace(datos.actualizado)}.`;
   if (tC != null){
@@ -876,7 +895,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-8";
+const APP_VERSION = "2026.10.31-9";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
