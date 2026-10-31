@@ -43,6 +43,8 @@ header h1 span{color:var(--oro)}
 .nota{color:var(--mut);font-size:12.5px;line-height:1.5;margin-top:6px}
 .sub{color:var(--mut);font-size:14px;margin:4px 0 16px}
 .lista{display:grid;gap:12px}
+.lista .opc{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.lista .opc.arrastra{position:relative;z-index:20;transform-origin:center;box-shadow:0 10px 28px rgba(0,0,0,.55);outline:2px solid var(--oro);opacity:.96;transition:none}
 .opc{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--oro);border-radius:16px;color:var(--txt);text-align:left;padding:18px 16px;font:700 17px Archivo,sans-serif;cursor:pointer;line-height:1.25}
 .opc small{display:block;color:var(--mut);font-weight:500;font-size:13px;margin-top:5px}
 .opc.radar{border-left-color:var(--verde)}
@@ -140,7 +142,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 <section class="pant" id="pRobot">
   <button class="volver" data-ir="pInicio">← Volver</button>
   <h2>🤖 ROBOTS</h2>
-  <p class="sub">Pulsa uno y te sale aquí su estado actual.</p>
+  <p class="sub">Pulsa uno y te sale aquí su estado actual. Para cambiar el orden, déjalo pulsado un segundo y arrástralo.</p>
   <div class="lista" id="lRobot"></div>
 </section>
 
@@ -148,7 +150,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 <section class="pant" id="pRadar">
   <button class="volver" data-ir="pInicio">← Volver</button>
   <h2>📡 RADARES</h2>
-  <p class="sub">Pulsa uno y te sale aquí su estado actual.</p>
+  <p class="sub">Pulsa uno y te sale aquí su estado actual. Para cambiar el orden, déjalo pulsado un segundo y arrástralo.</p>
   <div class="lista" id="lRadar"></div>
 </section>
 
@@ -252,15 +254,61 @@ document.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => ir(b.datas
 $("resVolver").onclick = () => ir(origen);
 $("bLlave").onclick = () => { $("llave").value = store("bolsa_llave") || ""; pintaLlave(); ir("pLlave"); };
 
+// Orden guardado por el usuario (los nuevos que no estén en su orden van al final)
+function ordenado(tipo){
+  const o = store("bolsa_orden_" + tipo) || [];
+  const pos = v => { const i = o.indexOf(v.wf); return i < 0 ? 1000 + VIG[tipo].indexOf(v) : i; };
+  return [...VIG[tipo]].sort((a, b) => pos(a) - pos(b));
+}
 function pintaLista(tipo){
   const l = $(tipo === "robot" ? "lRobot" : "lRadar"); l.innerHTML = "";
-  VIG[tipo].forEach(v => {
+  ordenado(tipo).forEach(v => {
     const b = document.createElement("button");
     b.className = "opc" + (tipo === "radar" ? " radar" : "");
+    b.dataset.wf = v.wf;
     b.innerHTML = esc(v.n) + "<small>" + esc(v.d) + "</small>";
-    b.onclick = () => abrir(v, tipo === "robot" ? "pRobot" : "pRadar");
+    b.onclick = () => { if (b.dataset.sinClic){ delete b.dataset.sinClic; return; } abrir(v, tipo === "robot" ? "pRobot" : "pRadar"); };
+    b.oncontextmenu = e => e.preventDefault();
+    arrastrable(b, l, tipo);
     l.appendChild(b);
   });
+}
+// Dejar pulsado un segundo y arrastrar arriba o abajo para cambiar el orden
+function arrastrable(el, lista, tipo){
+  let timer = null, arr = false, y0 = 0, x0 = 0, base = 0;
+  const fuera = () => { clearTimeout(timer); timer = null; };
+  el.addEventListener("touchstart", e => {
+    const t = e.touches[0]; y0 = t.pageY; x0 = t.pageX;
+    fuera();
+    timer = setTimeout(() => {
+      timer = null; arr = true; base = el.offsetTop;
+      el.classList.add("arrastra");
+      try{ navigator.vibrate && navigator.vibrate(30); }catch(err){}
+    }, 600);
+  }, {passive: true});
+  el.addEventListener("touchmove", e => {
+    const t = e.touches[0];
+    if (!arr){ if (Math.abs(t.pageY - y0) > 10 || Math.abs(t.pageX - x0) > 10) fuera(); return; }
+    e.preventDefault();
+    const dy = t.pageY - y0, centro = base + dy + el.offsetHeight / 2;
+    const otros = [...lista.children].filter(x => x !== el);
+    const sig = otros.find(x => x.offsetTop + x.offsetHeight / 2 > centro);
+    if (sig){ if (el.nextSibling !== sig) lista.insertBefore(el, sig); }
+    else if (lista.lastElementChild !== el) lista.appendChild(el);
+    el.style.transform = `translateY(${base + dy - el.offsetTop}px) scale(1.03)`;
+    // Si se lleva al borde de la pantalla, desplazar
+    if (t.clientY < 70) window.scrollBy(0, -12); else if (t.clientY > innerHeight - 70) window.scrollBy(0, 12);
+  }, {passive: false});
+  const suelta = () => {
+    fuera();
+    if (!arr) return;
+    arr = false; el.classList.remove("arrastra"); el.style.transform = "";
+    el.dataset.sinClic = "1"; setTimeout(() => delete el.dataset.sinClic, 400);
+    store("bolsa_orden_" + tipo, [...lista.children].map(x => x.dataset.wf));
+    toast("Orden guardado", 1500);
+  };
+  el.addEventListener("touchend", suelta);
+  el.addEventListener("touchcancel", suelta);
 }
 pintaLista("robot"); pintaLista("radar");
 
@@ -828,7 +876,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-7";
+const APP_VERSION = "2026.10.31-8";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
