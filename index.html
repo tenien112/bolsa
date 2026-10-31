@@ -439,7 +439,7 @@ $("abreCT").onclick = () => {
     location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.spotware.ct;S.browser_fallback_url=" + encodeURIComponent(web) + ";end";
   else window.open(web, "_blank");
 };
-// ---------- Mercados ya consultados: estrella y volver a ellos ----------
+// ---------- Último mercado consultado: estrella y volver a él ----------
 const hoyTxt = () => new Date().toLocaleDateString("es-ES");
 let vistos = (() => { const v = store("bolsa_vistos"); return v && v.dia === hoyTxt() ? v.l : []; })();
 let pendienteVolver = null;
@@ -448,7 +448,7 @@ function pintaVistos(){
 }
 function marcaVisto(sim){
   if (!sim) return;
-  if (!vistos.includes(sim)) vistos.push(sim);
+  vistos = [sim];   // solo el último consultado
   store("bolsa_vistos", {dia: hoyTxt(), l: vistos});
   pintaVistos();
 }
@@ -828,7 +828,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-6";
+const APP_VERSION = "2026.10.31-7";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
