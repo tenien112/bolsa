@@ -108,6 +108,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
     <button class="grande g-robot" data-ir="pRobot"><span class="e">🤖</span>ROBOT</button>
     <button class="grande g-radar" data-ir="pRadar"><span class="e">📡</span>RADAR</button>
     <button class="grande g-comunes" id="bComunes"><span class="e">🤝</span>COMUNES</button>
+    <button class="grande g-comunes" id="bComunes2"><span class="e">🤝</span>COMUNES M5-H4</button>
   </div>
   <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
 </section>
@@ -142,8 +143,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 <!-- COMUNES -->
 <section class="pant" id="pComunes">
   <button class="volver" data-ir="pInicio">← Volver</button>
-  <h2>🤝 COMUNES RADAR Y BOT</h2>
-  <p class="sub">Bajistas en el RADAR CAMBIO TENDENCIAS que el BOT COMPRAVENTA tiene en CORTO, y alcistas que tiene en LARGO.</p>
+  <h2 id="comTit">🤝 COMUNES RADAR Y BOT</h2>
+  <p class="sub" id="comSub">Bajistas en el RADAR CAMBIO TENDENCIAS que el BOT COMPRAVENTA tiene en CORTO, y alcistas que tiene en LARGO.</p>
   <div class="estado" id="comEstado"><div class="spin"></div><span>Cargando…</span></div>
   <div id="comRes" class="bloque"></div>
   <button class="btn" id="comRepetir" hidden>🔄 Volver a comprobar</button>
@@ -193,6 +194,7 @@ const VIG = {
     {n:"COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · metales, petróleo y criptos", wf:"radar-commodities.yml", p:"VIGILANTE COMMODITIES RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:1},
     {n:"FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", d:"M30-H1-H2-H4-H8 · 16 pares de divisas", wf:"radar-forex.yml", p:"VIGILANTE FOREX RADAR 5 TEMPORALIDADES 2 SALIDAS", partes:2},
     {n:"RADAR M5-M15-M30-H1-H2-H4", d:"5, 15 y 30 min, 1 h, 2 h y 4 h · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-rapido.yml", p:"VIGILANTE RADAR M5-M15-M30-H1-H2-H4", partes:1},
+    {n:"RADAR M5-M30-H1-H2-H4", d:"5 y 30 min, 1 h, 2 h y 4 h · el de COMUNES M5-H4", wf:"radar-m5h4.yml", p:"VIGILANTE RADAR M5-M30-H1-H2-H4", partes:1},
   ]
 };
 
@@ -482,7 +484,8 @@ async function lanzar(v){
 $("resRepetir").onclick = () => actual && lanzar(actual);
 
 // ---------- COMUNES: RADAR CAMBIO TENDENCIAS + BOT COMPRAVENTA ----------
-const V_RADAR = VIG.radar[0], V_BOT = VIG.robot[0];
+let V_RADAR = VIG.radar[0]; const V_BOT = VIG.robot[0];
+const RADAR_M5H4 = VIG.radar.find(v => v.wf === "radar-m5h4.yml");
 const normaliza = t => t.normalize("NFD").replace(/[\u0300-\u036f\u0332]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 // De un mensaje saca cada mercado con su dirección: 1 alcista/LARGO, -1 bajista/CORTO
 function direcciones(msg, tipo){
@@ -524,7 +527,10 @@ function ultimoEstado(ms, v){
   const u = une(est.filter(m => ult - m.time < 180));
   return u[u.length-1];
 }
-async function comunes(){
+async function comunes(vr){
+  V_RADAR = vr || VIG.radar[0];
+  $("comTit").textContent = V_RADAR === VIG.radar[0] ? "🤝 COMUNES RADAR Y BOT" : "🤝 COMUNES M5-H4 Y BOT";
+  $("comSub").textContent = `Bajistas en el ${V_RADAR.n} que el BOT COMPRAVENTA tiene en CORTO, y alcistas que tiene en LARGO.`;
   parar(); actual = "comunes";
   $("comRes").innerHTML = ""; $("comRepetir").hidden = true;
   ir("pComunes");
@@ -570,8 +576,9 @@ function estado2(txt, tipo){
   const el = $("comEstado"); el.className = "estado" + (tipo ? " " + tipo : "");
   el.innerHTML = (tipo ? (tipo === "ok" ? "✅" : "⚠️") : '<div class="spin"></div>') + `<span>${txt}</span>`;
 }
-$("bComunes").onclick = comunes;
-$("comRepetir").onclick = comunes;
+$("bComunes").onclick = () => comunes(VIG.radar[0]);
+$("bComunes2").onclick = () => comunes(RADAR_M5H4);
+$("comRepetir").onclick = () => comunes(V_RADAR);
 
 // ---------- Instalar ----------
 let installEvt = null;
@@ -584,7 +591,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.30-10";
+const APP_VERSION = "2026.10.31-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
