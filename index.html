@@ -114,7 +114,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gCaja{position:relative;flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 #gLinea{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--oro);pointer-events:none;z-index:5;display:none}
 #gEtq{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
-#gRadar{position:absolute;bottom:34px;left:6px;max-width:calc(100% - 12px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
+#gRadar{position:absolute;bottom:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
 #gRadar small{display:block;color:var(--mut);font-size:12px;font-weight:400}
 #gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
 #gRadar .tfs{position:relative;display:inline-block;padding-top:20px;white-space:pre}
@@ -124,6 +124,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gRadar u.s2{text-decoration-thickness:3px;text-underline-offset:4px}
 #gRadar u.s3{text-decoration-thickness:1px;text-underline-offset:3px}
 #gRadar b.a{color:#0E1A14;background:#2FBF71;border-radius:5px;padding:0 5px}#gRadar b.b{color:#fff;background:#E5484D;border-radius:5px;padding:0 5px}
+#gAuto{position:absolute;right:4px;bottom:32px;z-index:7;font:700 12px "JetBrains Mono",monospace;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
+#gAuto.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 </style>
 </head>
@@ -214,7 +216,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 <div id="graf">
   <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
   <div id="gTfs"></div>
-  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div></div>
+  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button></div>
   <p id="gNota"></p>
 </div>
 <div id="toast"></div>
@@ -623,7 +625,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
-  $("gTit").innerHTML = `${esc(titulo)}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : "Sin hora de cambio en esta línea"}</small>`;
+  $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : "Sin hora de cambio en esta línea"}</small>`;
   $("gTfs").innerHTML = Object.keys(TF_NOM).map(k => `<button data-tf="${k}" class="${k === tf ? "on" : ""}">${TF_NOM[k]}</button>`).join("");
   $("gTfs").querySelectorAll("button").forEach(b => b.onclick = () => abreGraf(sim, b.dataset.tf, cambio, titulo, tfs));
   $("gNota").textContent = "Cargando velas…";
@@ -655,6 +657,24 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   const serie = chart.addCandlestickSeries({upColor:"#2FBF71", downColor:"#E5484D", borderVisible:false, wickUpColor:"#2FBF71", wickDownColor:"#E5484D",
     priceFormat: {type:"price", precision: dec, minMove: Math.pow(10, -dec)}});
   serie.setData(velas);
+  // Botón AUTO (como en TradingView): ajusta el alto de las velas a lo que se ve. Se guarda la elección
+  const pintaAuto = () => $("gAuto").classList.toggle("on", !!chart.priceScale("right").options().autoScale);
+  chart.priceScale("right").applyOptions({autoScale: store("bolsa_auto") !== false});
+  pintaAuto();
+  $("gAuto").onclick = () => {
+    const on = !chart.priceScale("right").options().autoScale;
+    chart.priceScale("right").applyOptions({autoScale: on});
+    store("bolsa_auto", on); pintaAuto();
+    toast(on ? "AUTO: las velas se ajustan solas" : "AUTO quitado: estira o encoge el eje de precios con el dedo", 2500);
+  };
+  // Si se estira el eje de precios con el dedo, AUTO se quita solo (igual que en TradingView)
+  const revisaAuto = () => setTimeout(() => {
+    if (!G || G.chart !== chart) return;
+    const on = !!chart.priceScale("right").options().autoScale;
+    if (on !== (store("bolsa_auto") !== false)){ store("bolsa_auto", on); pintaAuto(); }
+  }, 50);
+  $("gCaja").addEventListener("touchend", revisaAuto);
+  $("gCaja").addEventListener("mouseup", revisaAuto);
   G = {chart, serie, iCambio: null, orig, dur: (+tf) * 60, tf, datos,
        tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
   // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
@@ -895,7 +915,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-9";
+const APP_VERSION = "2026.10.31-10";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
