@@ -112,6 +112,10 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gCaja{position:relative;flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 #gLinea{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--oro);pointer-events:none;z-index:5;display:none}
 #gEtq{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
+#gRadar{position:absolute;bottom:34px;left:6px;right:70px;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
+#gRadar small{display:block;color:var(--mut);font-size:12px;font-weight:400}
+#gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
+#gRadar b.a{color:#0E1A14;background:#2FBF71;border-radius:5px;padding:0 5px}#gRadar b.b{color:#fff;background:#E5484D;border-radius:5px;padding:0 5px}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 </style>
 </head>
@@ -202,7 +206,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 <div id="graf">
   <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
   <div id="gTfs"></div>
-  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div></div>
+  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div></div>
   <p id="gNota"></p>
 </div>
 <div id="toast"></div>
@@ -358,6 +362,13 @@ function intervaloTV(l){
   for (const m of limpio.matchAll(/\b([MHDW])(\d*)[+\-.\]]/g)){ const min = aMin(m[1], m[2]); if (min > max) max = min; }
   return max ? fmt(max) : "120";
 }
+// Temporalidades que trae la línea del radar (M15+ M30- H1+ …), en su orden
+function tfsDeLinea(t){
+  const vistas = [];
+  for (const m of (t || "").replace(/\u0332/g, "").matchAll(/\b([MH]\d+)[+\-.]/g)) if (TF_MIN[m[1]] && !vistas.includes(m[1])) vistas.push(m[1]);
+  return vistas;
+}
+const TF_MIN = {M5:5, M15:15, M30:30, H1:60, H2:120, H4:240, H8:480};
 // Pulsar un mercado: elegir entre TradingView, XTB en el navegador, la app de XTB o cTrader
 const XTB_ESP = {"XAUUSD":"GOLD","XAGUSD":"SILVER","USOIL":"OIL.WTI","BTCUSD":"BITCOIN","XPTUSD":"PLATINUM","XPDUSD":"PALLADIUM","ETHUSD":"ETHEREUM"};
 const simboloXTB = tv => { const b = tv.split(":").pop(); return XTB_ESP[b] || b; };
@@ -374,7 +385,7 @@ window.addEventListener("popstate", () => {
 });
 document.addEventListener("click", e => {
   const d = e.target.closest(".lin.tv"); if (!d) return;
-  elegido = {tv: d.dataset.tv, tf: d.dataset.tf || "30", cambio: d.dataset.cambio || ""};
+  elegido = {tv: d.dataset.tv, tf: d.dataset.tf || "30", cambio: d.dataset.cambio || "", tfs: tfsDeLinea(d.textContent)};
   const x = simboloXTB(elegido.tv);
   $("hojaTit").textContent = x;
   $("hojaCambio").innerHTML = elegido.cambio
@@ -505,7 +516,7 @@ function cierraGraf(){
   $("graf").classList.remove("on");
   if (abierto && simTV){ const x = simTV; marcaVisto(x); setTimeout(() => irAlVisto(x), 50); }
   if (G && G.chart) G.chart.remove();
-  G = null; $("gLinea").style.display = "none";
+  G = null; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
 }
 function colocaLinea(){
   if (!G || G.iCambio == null) { $("gLinea").style.display = "none"; return; }
@@ -516,15 +527,38 @@ function colocaLinea(){
   if (x == null || x < 0 || x > ancho) { $("gLinea").style.display = "none"; return; }
   $("gLinea").style.left = x + "px"; $("gLinea").style.display = "block";
 }
-async function abreGraf(sim, tf, cambio, titulo){
+// Cómo estaba el radar al cierre de la vela que se toca con el dedo
+function estadoEn(lista, t){
+  // lista = [[hora de cierre, estado], ...] ordenada: el último cambio anterior o igual a t
+  let a = 0, b = (lista || []).length - 1, r = null;
+  while (a <= b){ const m = (a + b) >> 1; if (lista[m][0] <= t){ r = lista[m][1]; a = m + 1; } else b = m - 1; }
+  return r;
+}
+function pintaRadar(tVela){
+  const caja = $("gRadar");
+  if (!G || tVela == null || !G.orig.has(tVela)) return;
+  const fin = G.orig.get(tVela) + G.dur;          // cierre de la vela (UTC)
+  const ahora = Math.min(fin, G.datos.actualizado || fin);
+  const radar = G.datos.radar;
+  const f = new Date(tVela * 1000), dd = n => String(n).padStart(2, "0");
+  const cuando = `${dd(f.getUTCDate())}/${dd(f.getUTCMonth()+1)} ${dd(f.getUTCHours())}:${dd(f.getUTCMinutes())}`;
+  if (!radar){ caja.innerHTML = `<small>Vela ${cuando}</small>Aún no hay historial del radar: ejecuta cualquier radar desde la app y vuelve en un par de minutos.`; caja.style.display = "block"; return; }
+  const es = G.tfs.map(tf => ({tf, e: estadoEn(radar[String(TF_MIN[tf])], ahora)}));
+  const txt = es.map(o => o.e == null ? `<span class="z">${o.tf}?</span>` : `<span class="${o.e > 0 ? "p" : o.e < 0 ? "n" : "z"}">${o.tf}${o.e > 0 ? "+" : o.e < 0 ? "-" : "."}</span>`).join(" ");
+  const todos = es.length && es.every(o => o.e === es[0].e) ? es[0].e : 0;
+  const g = todos > 0 ? ' <b class="a">ALCISTA</b>' : todos < 0 ? ' <b class="b">BAJISTA</b>' : "";
+  caja.innerHTML = `<small>Radar al cierre de la vela ${cuando} (${nombreTF(G.tf)})</small>${txt}${g}`;
+  caja.style.display = "block";
+}
+async function abreGraf(sim, tf, cambio, titulo, tfs){
   if (G && G.chart) G.chart.remove();
-  G = null; $("gLinea").style.display = "none";
+  G = null; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
   $("gTit").innerHTML = `${esc(titulo)}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : "Sin hora de cambio en esta línea"}</small>`;
   $("gTfs").innerHTML = Object.keys(TF_NOM).map(k => `<button data-tf="${k}" class="${k === tf ? "on" : ""}">${TF_NOM[k]}</button>`).join("");
-  $("gTfs").querySelectorAll("button").forEach(b => b.onclick = () => abreGraf(sim, b.dataset.tf, cambio, titulo));
+  $("gTfs").querySelectorAll("button").forEach(b => b.onclick = () => abreGraf(sim, b.dataset.tf, cambio, titulo, tfs));
   $("gNota").textContent = "Cargando velas…";
   let L, datos;
   try { [L, datos] = await Promise.all([cargaLW(), leeVelas(sim)]); }
@@ -537,8 +571,8 @@ async function abreGraf(sim, tf, cambio, titulo){
   if (!$("graf").classList.contains("on")) return;
   if (!TF_NOM[tf]) tf = "240";
   const crudas = (datos.tf || {})[tf] || [];
-  const velas = []; let ant = -Infinity;
-  for (const v of crudas){ const t = aMadrid(v[0]); if (t <= ant) continue; ant = t; velas.push({time:t, open:v[1], high:v[2], low:v[3], close:v[4]}); }
+  const velas = [], orig = new Map(); let ant = -Infinity;
+  for (const v of crudas){ const t = aMadrid(v[0]); if (t <= ant) continue; ant = t; orig.set(t, v[0]); velas.push({time:t, open:v[1], high:v[2], low:v[3], close:v[4]}); }
   if (!velas.length){ $("gNota").textContent = "No hay velas de " + nombreTF(tf) + " para este mercado."; return; }
   const ultimo = velas[velas.length - 1].close;
   const dec = ultimo < 10 ? 5 : ultimo < 300 ? 3 : 2;
@@ -554,7 +588,11 @@ async function abreGraf(sim, tf, cambio, titulo){
   const serie = chart.addCandlestickSeries({upColor:"#2FBF71", downColor:"#E5484D", borderVisible:false, wickUpColor:"#2FBF71", wickDownColor:"#E5484D",
     priceFormat: {type:"price", precision: dec, minMove: Math.pow(10, -dec)}});
   serie.setData(velas);
-  G = {chart, serie, iCambio: null};
+  G = {chart, serie, iCambio: null, orig, dur: (+tf) * 60, tf, datos,
+       tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
+  // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
+  chart.subscribeCrosshairMove(p => { if (p && p.time != null) pintaRadar(p.time); });
+  chart.subscribeClick(p => { if (p && p.time != null) pintaRadar(p.time); });
   const tC = cambioASeg(cambio), dur = (+tf) * 60, n = velas.length;
   let nota = `Velas de ${nombreTF(tf)} en hora de Madrid · guardadas ${hace(datos.actualizado)}.`;
   if (tC != null){
@@ -569,7 +607,7 @@ async function abreGraf(sim, tf, cambio, titulo){
     }
   }
   if (G.iCambio == null) chart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - 90), to: n + 4});
-  $("gNota").textContent = nota + " Desliza para moverte y pellizca para ampliar.";
+  $("gNota").textContent = nota + " Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -579,7 +617,7 @@ $("abreGraf").onclick = () => {
   if (!elegido) return;
   const e = elegido; cierraHoja(); abreCapa();   // la hoja deja su sitio en el historial al gráfico
   simTV = e.tv;
-  abreGraf(simboloCT(e.tv), TF_NOM[e.tf] ? e.tf : "240", e.cambio, simboloXTB(e.tv) + " · " + nombreTF(TF_NOM[e.tf] ? e.tf : "240"));
+  abreGraf(simboloCT(e.tv), TF_NOM[e.tf] ? e.tf : "240", e.cambio, simboloXTB(e.tv) + " · " + nombreTF(TF_NOM[e.tf] ? e.tf : "240"), e.tfs);
 };
 
 function tarjeta(m, vieja){
@@ -790,7 +828,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-5";
+const APP_VERSION = "2026.10.31-6";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
