@@ -114,7 +114,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gCaja{position:relative;flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 #gLinea{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--oro);pointer-events:none;z-index:5;display:none}
 #gEtq{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
-#gRadar{position:absolute;bottom:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
+#gRadar{position:absolute;top:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
 #gRadar small{display:block;color:var(--mut);font-size:12px;font-weight:400}
 #gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
 #gRadar .tfs{position:relative;display:inline-block;padding-top:20px;white-space:pre}
@@ -619,6 +619,24 @@ function pintaRadar(tVela, xDedo){
     caja.style.left = Math.max(4, Math.min(ancho - w - 4, xDedo - w / 2)) + "px";
   }
 }
+// MACD clásico (EMA 12 - EMA 26, señal EMA 9, histograma = MACD - señal)
+function ema(vals, n){
+  const r = new Array(vals.length).fill(null), k = 2 / (n + 1);
+  let suma = 0, cnt = 0, prev = null;
+  for (let i = 0; i < vals.length; i++){
+    const v = vals[i]; if (v == null) continue;
+    if (prev == null){ suma += v; cnt++; if (cnt === n){ prev = suma / n; r[i] = prev; } }
+    else { prev = v * k + prev * (1 - k); r[i] = prev; }
+  }
+  return r;
+}
+function calculaMACD(cierres, r = 12, l = 26, s = 9){
+  const a = ema(cierres, r), b = ema(cierres, l);
+  const macd = cierres.map((_, i) => a[i] != null && b[i] != null ? a[i] - b[i] : null);
+  const sen = ema(macd, s);
+  const h = macd.map((x, i) => x != null && sen[i] != null ? x - sen[i] : null);
+  return {macd, sen, h};
+}
 async function abreGraf(sim, tf, cambio, titulo, tfs){
   if (G && G.chart) G.chart.remove();
   G = null; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
@@ -657,6 +675,19 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   const serie = chart.addCandlestickSeries({upColor:"#2FBF71", downColor:"#E5484D", borderVisible:false, wickUpColor:"#2FBF71", wickDownColor:"#E5484D",
     priceFormat: {type:"price", precision: dec, minMove: Math.pow(10, -dec)}});
   serie.setData(velas);
+  // MACD (12, 26, 9) en la parte de abajo del gráfico, con su propia escala
+  serie.priceScale().applyOptions({scaleMargins: {top: 0.05, bottom: 0.3}});
+  const m = calculaMACD(velas.map(v => v.close));
+  const sM = {priceScaleId: "macd", priceFormat: {type: "price", precision: dec + 1, minMove: Math.pow(10, -(dec + 1))}, lastValueVisible: false, priceLineVisible: false};
+  const hist = chart.addHistogramSeries(sM);
+  const lMacd = chart.addLineSeries({...sM, color: "#4DA3FF", lineWidth: 2, title: "MACD"});
+  const lSen = chart.addLineSeries({...sM, color: "#FF9F1C", lineWidth: 2, title: "Señal"});
+  chart.priceScale("macd").applyOptions({scaleMargins: {top: 0.75, bottom: 0.02}, borderColor: "#2A4234"});
+  const pts = (arr, f) => velas.map((v, k) => arr[k] == null ? {time: v.time} : f(arr[k], k, v.time));
+  hist.setData(pts(m.h, (x, k) => ({time: velas[k].time, value: x,
+    color: x >= 0 ? (k && m.h[k-1] != null && x < m.h[k-1] ? "#1F7A4A" : "#2FBF71") : (k && m.h[k-1] != null && x > m.h[k-1] ? "#8E2E31" : "#E5484D")})));
+  lMacd.setData(pts(m.macd, (x, k, t) => ({time: t, value: x})));
+  lSen.setData(pts(m.sen, (x, k, t) => ({time: t, value: x})));
   // Botón AUTO (como en TradingView): ajusta el alto de las velas a lo que se ve. Se guarda la elección
   const pintaAuto = () => $("gAuto").classList.toggle("on", !!chart.priceScale("right").options().autoScale);
   chart.priceScale("right").applyOptions({autoScale: store("bolsa_auto") !== false});
@@ -694,7 +725,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
     }
   }
   if (G.iCambio == null) chart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - 90), to: n + 4});
-  $("gNota").textContent = nota + " Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
+  $("gNota").textContent = nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal. Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -915,7 +946,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.10.31-10";
+const APP_VERSION = "2026.10.31-11";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
