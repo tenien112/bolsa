@@ -156,6 +156,11 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 .posi .bs{display:flex;gap:8px;margin-top:10px}
 .posi .bs button{flex:1;padding:11px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:700 14px Archivo,sans-serif;cursor:pointer}
 .lin.conpos::after{content:" 📌"}
+
+.ordenBar{display:flex;gap:8px;margin:10px 0 4px;position:sticky;top:0;z-index:4;background:var(--bg);padding:6px 0}
+.ordenBar button{flex:1;padding:11px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--mut);font:900 13px Archivo,sans-serif;letter-spacing:.5px;cursor:pointer}
+.ordenBar button.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
+.ordenBar button.on::after{content:" ▼"}
 </style>
 </head>
 <body>
@@ -197,6 +202,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <button class="volver" id="resVolver">← Volver</button>
   <h2 id="resTit"></h2>
   <div class="estado" id="resEstado"><div class="spin"></div><span>Cargando…</span></div>
+  <div class="ordenBar"><button data-o="a">🔤 MERCADO (A-Z)</button><button data-o="t">🕒 ÚLTIMO CAMBIO</button></div>
   <div id="resAhora" class="bloque"></div>
   <div id="resGuardado" class="bloque"></div>
   <div id="resAvisos" class="bloque"></div>
@@ -209,6 +215,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <h2 id="comTit">🤝 COMUNES RADAR Y BOT</h2>
   <p class="sub" id="comSub">Bajistas en el RADAR CAMBIO TENDENCIAS que el BOT COMPRAVENTA tiene en CORTO, y alcistas que tiene en LARGO.</p>
   <div class="estado" id="comEstado"><div class="spin"></div><span>Cargando…</span></div>
+  <div class="ordenBar"><button data-o="a">🔤 MERCADO (A-Z)</button><button data-o="t">🕒 ÚLTIMO CAMBIO</button></div>
   <div id="comRes" class="bloque"></div>
   <button class="btn" id="comRepetir" hidden>🔄 Volver a comprobar</button>
 </section>
@@ -830,7 +837,7 @@ function ordenaPorCambio(ls){
 }
 function tarjeta(m, vieja){
   let crudas = (m.message || "").split("\n");
-  crudas = ordenaPorCambio(crudas);   // radares y robots: del cambio más reciente al más antiguo
+
   const lineas = crudas.map(l => {
     const cls = /BAJISTA|CORTO|⬇|🔴|baja/i.test(l) ? " b" : /ALCISTA|LARGO|⬆|🟢|sube/i.test(l) ? " a" : "";
     const sim = simboloTV(l), tfm = intervaloTV(l);
@@ -1163,6 +1170,51 @@ function dibujaPosiciones(sim, serie, velas, L){
   return txt.join(" ") + " ";
 }
 
+
+// ---------- Ordenar los mercados: por último cambio (todo junto) o por nombre (A-Z) ----------
+let modoOrden = store("bolsa_modo_orden") === "a" ? "a" : "t";
+const esSeparador = el => /^[—–\-=]{1,3}\s*\S.*\S\s*[—–\-=]{1,3}$/.test(el.textContent.trim());
+const nombreMercado = el => el.textContent.trim().replace(/^★\s*/, "").split(/[:·]/)[0].trim();
+function ordenaDOM(raiz){
+  (raiz || document).querySelectorAll(".msg, .grupo").forEach(c => {
+    const lins = [...c.children].filter(el => el.classList.contains("lin"));
+    if (lins.length < 2) return;
+    lins.forEach((el, i) => { if (el.dataset.i == null) el.dataset.i = i; });
+    const pos = el => +el.dataset.i;
+    const orig = lins.slice().sort((a, b) => pos(a) - pos(b));
+    const merc = orig.filter(el => el.dataset.tv);
+    if (!merc.length) return;
+    let orden;
+    if (modoOrden === "t"){
+      // Todos los mercados juntos, del cambio más reciente al más antiguo; los que no traen hora, al final
+      const t = el => { const x = cambioASeg(el.dataset.cambio); return x == null ? -Infinity : x; };
+      const m = merc.slice().sort((a, b) => t(b) - t(a) || pos(a) - pos(b));
+      const p0 = pos(merc[0]), p1 = pos(merc[merc.length - 1]);
+      const antes = orig.filter(el => !el.dataset.tv && pos(el) < p0);
+      const medio = orig.filter(el => !el.dataset.tv && pos(el) > p0 && pos(el) < p1);
+      const despues = orig.filter(el => !el.dataset.tv && pos(el) > p1);
+      medio.forEach(el => el.hidden = esSeparador(el));   // «— COMMODITIES —» sobra si va todo junto
+      orden = [...antes, ...m, ...medio.filter(el => !el.hidden), ...medio.filter(el => el.hidden), ...despues];
+    } else {
+      // Por nombre dentro de cada bloque (se mantienen los apartados)
+      orden = []; let tramo = [];
+      const vuelca = () => { tramo.sort((a, b) => nombreMercado(a).localeCompare(nombreMercado(b), "es")); orden.push(...tramo); tramo = []; };
+      orig.forEach(el => { el.hidden = false; if (el.dataset.tv) tramo.push(el); else { vuelca(); orden.push(el); } });
+      vuelca();
+    }
+    const ancla = [...c.children].find(el => el.classList.contains("h")) || null;
+    orden.forEach(el => c.insertBefore(el, ancla));
+  });
+}
+function pintaOrden(){ document.querySelectorAll(".ordenBar button").forEach(b => b.classList.toggle("on", b.dataset.o === modoOrden)); }
+document.querySelectorAll(".ordenBar button").forEach(b => b.onclick = () => {
+  modoOrden = b.dataset.o; store("bolsa_modo_orden", modoOrden); pintaOrden(); ordenaDOM();
+  toast(modoOrden === "t" ? "Ordenado por último cambio (el más reciente arriba)" : "Ordenado por mercado (A-Z)", 2000);
+});
+pintaOrden();
+// Cada vez que llegan resultados nuevos, se ordenan solos
+["resAhora", "resGuardado", "comRes"].forEach(id => new MutationObserver(() => ordenaDOM($(id))).observe($(id), {childList: true}));
+
 // ---------- Instalar ----------
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").style.display = "block"; });
@@ -1174,7 +1226,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.02-3";
+const APP_VERSION = "2026.11.02-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
