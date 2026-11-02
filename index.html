@@ -129,6 +129,33 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gMacd.on{background:#4DA3FF;color:#0E1A14;border-color:#4DA3FF}
 #gAuto.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
+
+.g-pos{background:#C9A2FF}
+.e-pos{background:#C9A2FF;color:#0E1A14}
+#posF{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:12}
+#posF.on{display:flex}
+#posF .caj{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;width:100%;max-width:620px;padding:18px 16px max(20px,env(safe-area-inset-bottom));animation:sube .2s ease;max-height:92vh;overflow:auto}
+#posF h3{margin:0 0 10px;font-size:20px}
+#posF label{display:block;font-size:13px;color:var(--mut);margin-top:8px}
+#posF input,#posF select{margin:4px 0}
+select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:#0B140F;color:var(--txt);font:400 15px "JetBrains Mono",monospace}
+.seg{display:flex;gap:8px;margin:4px 0}
+.seg button{flex:1;padding:14px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:900 17px Archivo,sans-serif;cursor:pointer}
+.seg button.on.l{background:var(--verde);color:#0E1A14;border-color:var(--verde)}
+.seg button.on.c{background:var(--rojo);color:#fff;border-color:var(--rojo)}
+.dos{display:flex;gap:8px}.dos>div{flex:1}
+.mini{background:none;border:0;color:var(--oro);font:700 13px Archivo,sans-serif;cursor:pointer;padding:2px 0}
+.posi{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--verde);border-radius:16px;padding:14px;margin-bottom:12px}
+.posi.c{border-left-color:var(--rojo)}
+.posi .t{font:900 18px Archivo,sans-serif}
+.posi .t b{font-size:13px;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.posi .t b.l{background:var(--verde);color:#0E1A14}.posi .t b.c{background:var(--rojo);color:#fff}
+.posi .d{font:400 13.5px/1.5 "JetBrains Mono",monospace;color:var(--mut);margin-top:6px}
+.posi .r{font:900 22px "JetBrains Mono",monospace;margin-top:6px}
+.posi .r.g{color:var(--verde)}.posi .r.p{color:var(--rojo)}.posi .r small{font:500 12px Archivo,sans-serif;color:var(--mut);display:block}
+.posi .bs{display:flex;gap:8px;margin-top:10px}
+.posi .bs button{flex:1;padding:11px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:700 14px Archivo,sans-serif;cursor:pointer}
+.lin.conpos::after{content:" 📌"}
 </style>
 </head>
 <body>
@@ -144,6 +171,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
     <button class="grande g-radar" data-ir="pRadar"><span class="e">📡</span>RADAR</button>
     <button class="grande g-comunes" id="bComunes"><span class="e">🤝</span>COMUNES</button>
     <button class="grande g-comunes" id="bComunes2"><span class="e">🤝</span>COMUNES M5-H4</button>
+    <button class="grande g-pos" id="bPos"><span class="e">📌</span>MIS POSICIONES</button>
   </div>
   <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
 </section>
@@ -185,6 +213,15 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
   <button class="btn" id="comRepetir" hidden>🔄 Volver a comprobar</button>
 </section>
 
+<!-- MIS POSICIONES -->
+<section class="pant" id="pPos">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>📌 MIS POSICIONES</h2>
+  <p class="sub">Las posiciones que apuntes aquí (las que abres en XTB o cTrader). Se ven también dibujadas en el gráfico de la app. Se guardan en este móvil.</p>
+  <div id="lPos"></div>
+  <button class="btn" id="posNueva">➕ Apuntar una posición</button>
+</section>
+
 <!-- LLAVE -->
 <section class="pant" id="pLlave">
   <button class="volver" data-ir="pInicio">← Volver</button>
@@ -211,6 +248,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
     <button class="eleg e-tv" id="abreTV"><span class="e">📈</span><span>TradingView<small>Se abre en el gráfico de este mercado</small></span></button>
     <button class="eleg e-web" id="abreXTBWeb"><span class="e">🌐</span><span>XTB en el navegador<small class="xtbSub"></small></span></button>
     <button class="eleg e-xtb" id="abreXTB"><span class="e">📱</span><span>App de XTB<small class="xtbSub"></small></span></button>
+    <button class="eleg e-pos" id="abrePos"><span class="e">📌</span><span>Apuntar mi posición<small id="posSub">Largo o corto, precio, stop loss y take profit</small></span></button>
     <button class="eleg e-ct" id="abreCT"><span class="e">📊</span><span>cTrader<small id="ctSub"></small></span></button>
     <button class="btn sec" id="hojaCerrar">Cancelar</button>
   </div>
@@ -220,6 +258,25 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
   <div id="gTfs"></div>
   <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button></div>
   <p id="gNota"></p>
+</div>
+<div id="posF">
+  <div class="caj">
+    <h3 id="pfTit">📌 Apuntar posición</h3>
+    <label>Mercado</label>
+    <select id="pfMer"></select>
+    <label>Dirección</label>
+    <div class="seg"><button class="l" id="pfL">▲ LARGO</button><button class="c" id="pfC">▼ CORTO</button></div>
+    <label>Precio de entrada <button class="mini" id="pfUlt">usar el último precio</button></label>
+    <input id="pfPre" type="number" step="any" inputmode="decimal" placeholder="Ej. 1.08520">
+    <label>Fecha y hora de entrada (hora de Madrid)</label>
+    <input id="pfHora" type="datetime-local">
+    <div class="dos">
+      <div><label>Stop loss (opcional)</label><input id="pfSL" type="number" step="any" inputmode="decimal"></div>
+      <div><label>Take profit (opcional)</label><input id="pfTP" type="number" step="any" inputmode="decimal"></div>
+    </div>
+    <button class="btn" id="pfGuarda">Guardar posición</button>
+    <button class="btn sec" id="pfCancela">Cancelar</button>
+  </div>
 </div>
 <div id="toast"></div>
 
@@ -438,6 +495,7 @@ const hayCapa = () => !!(history.state && history.state.capa);
 function abreCapa(){ if (!hayCapa()) history.pushState({capa: 1}, ""); }
 function cierraCapa(){ if (hayCapa()) history.back(); }
 window.addEventListener("popstate", () => {
+  if ($("posF").classList.contains("on")){ cierraPosF(); return; }
   if ($("graf").classList.contains("on")) cierraGraf();
   if ($("hoja").classList.contains("on")) cierraHoja();
 });
@@ -502,7 +560,12 @@ const hoyTxt = () => new Date().toLocaleDateString("es-ES");
 let vistos = (() => { const v = store("bolsa_vistos"); return v && v.dia === hoyTxt() ? v.l : []; })();
 let pendienteVolver = null;
 function pintaVistos(){
-  document.querySelectorAll(".lin.tv").forEach(el => el.classList.toggle("visto", vistos.includes(el.dataset.tv)));
+  const conPos = new Set((store("bolsa_posiciones") || []).map(p => p.sim));
+  document.querySelectorAll(".lin.tv").forEach(el => {
+    el.classList.toggle("visto", vistos.includes(el.dataset.tv));
+    const c = conPos.has(el.dataset.tv.split(":").pop());
+    if (el.classList.contains("conpos") !== c) el.classList.toggle("conpos", c);
+  });
 }
 function marcaVisto(sim){
   if (!sim) return;
@@ -645,7 +708,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
-  $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : "Sin hora de cambio en esta línea"}</small>`;
+  $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : posiciones().some(p => p.sim === sim) ? "📌 Con tu posición dibujada" : "Sin hora de cambio en esta línea"}</small>`;
   $("gTfs").innerHTML = Object.keys(TF_NOM).map(k => `<button data-tf="${k}" class="${k === tf ? "on" : ""}">${TF_NOM[k]}</button>`).join("");
   $("gTfs").querySelectorAll("button").forEach(b => b.onclick = () => abreGraf(sim, b.dataset.tf, cambio, titulo, tfs));
   $("gNota").textContent = "Cargando velas…";
@@ -677,6 +740,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   const serie = chart.addCandlestickSeries({upColor:"#2FBF71", downColor:"#E5484D", borderVisible:false, wickUpColor:"#2FBF71", wickDownColor:"#E5484D",
     priceFormat: {type:"price", precision: dec, minMove: Math.pow(10, -dec)}});
   serie.setData(velas);
+  const notaPos = dibujaPosiciones(sim, serie, velas, L);
   // MACD (12, 26, 9) en la parte de abajo del gráfico, con su propia escala. Botón MACD para quitarlo o ponerlo (se guarda)
     const m = calculaMACD(velas.map(v => v.close));
   const sM = {priceScaleId: "macd", priceFormat: {type: "price", precision: dec + 1, minMove: Math.pow(10, -(dec + 1))}, lastValueVisible: false, priceLineVisible: false};
@@ -714,7 +778,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   }, 50);
   $("gCaja").addEventListener("touchend", revisaAuto);
   $("gCaja").addEventListener("mouseup", revisaAuto);
-  G = {chart, serie, iCambio: null, orig, dur: (+tf) * 60, tf, datos,
+  G = {chart, serie, iCambio: null, orig, dur: (+tf) * 60, tf, datos, cambio, titulo, tfsPedidas: tfs,
        tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
   // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
   chart.subscribeCrosshairMove(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
@@ -732,8 +796,13 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
       chart.timeScale().setVisibleLogicalRange({from: Math.max(0, Math.min(i - 25, n - 90)), to: n + 4});
     }
   }
-  if (G.iCambio == null) chart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - 90), to: n + 4});
-  $("gNota").textContent = nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
+  if (G.iCambio == null){
+    const pe = posiciones().filter(p => p.sim === sim).map(p => aMadrid(p.hora)).sort((a, b) => a - b)[0];
+    let i0 = n - 90;
+    if (pe != null){ let k = 0; while (k < n && velas[k].time <= pe) k++; i0 = Math.min(k - 25, n - 90); }
+    chart.timeScale().setVisibleLogicalRange({from: Math.max(0, i0), to: n + 4});
+  }
+  $("gNota").textContent = notaPos + nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -957,6 +1026,142 @@ $("bComunes").onclick = () => comunes(VIG.radar[0]);
 $("bComunes2").onclick = () => comunes(RADAR_M5H4);
 $("comRepetir").onclick = () => comunes(V_RADAR);
 
+
+// ---------- Mis posiciones (apuntadas a mano; XTB no deja leerlas desde fuera) ----------
+const MERCADOS = [
+  ["XAUUSD","ORO (GOLD)","OANDA:XAUUSD"],["XAGUSD","PLATA (SILVER)","OANDA:XAGUSD"],["XPTUSD","PLATINO","OANDA:XPTUSD"],["XPDUSD","PALADIO","OANDA:XPDUSD"],
+  ["USOIL","PETRÓLEO WTI (OIL.WTI)","TVC:USOIL"],["BTCUSD","BITCOIN","BITSTAMP:BTCUSD"],["ETHUSD","ETHEREUM","BITSTAMP:ETHUSD"],
+  ...["AUDUSD","EURAUD","EURCAD","EURCHF","EURCNH","EURGBP","EURJPY","EURUSD","GBPAUD","GBPCAD","GBPCHF","GBPJPY","GBPUSD","USDCAD","USDCHF","USDCNH","USDJPY"]
+    .map(x => [x, x.slice(0,3) + "/" + x.slice(3), (x.includes("CNH") ? "FX_IDC:" : "FX:") + x])
+];
+const merDe = sim => MERCADOS.find(m => m[0] === sim) || [sim, sim, "FX:" + sim];
+const posiciones = () => store("bolsa_posiciones") || [];
+const guardaPos = l => { store("bolsa_posiciones", l); pintaVistos(); };
+const fmtP = (x, ref) => { if (x == null || isNaN(x)) return "—"; const r = Math.abs(ref || x); const d = r < 10 ? 5 : r < 300 ? 3 : 2; return (+x).toLocaleString("es-ES", {minimumFractionDigits: d, maximumFractionDigits: d}); };
+const fHora = t => new Date(t * 1000).toLocaleString("es-ES", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
+function resultado(p, precio){
+  if (precio == null) return null;
+  const dif = p.dir === "L" ? precio - p.precio : p.precio - precio;
+  return {dif, pct: dif / p.precio * 100};
+}
+let posEdit = null, posDir = "L";
+function abrePosF(sim, p){
+  posEdit = p ? p.id : null;
+  $("pfTit").textContent = p ? "✏️ Cambiar posición" : "📌 Apuntar posición";
+  $("pfMer").innerHTML = MERCADOS.map(m => `<option value="${m[0]}">${esc(m[1])}</option>`).join("");
+  $("pfMer").value = (p && p.sim) || sim || "XAUUSD";
+  posDir = p ? p.dir : "L"; pintaDir();
+  $("pfPre").value = p ? p.precio : "";
+  const d = new Date((p ? p.hora : Date.now() / 1000) * 1000); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  $("pfHora").value = d.toISOString().slice(0, 16);
+  $("pfSL").value = p && p.sl != null ? p.sl : "";
+  $("pfTP").value = p && p.tp != null ? p.tp : "";
+  $("posF").classList.add("on"); abreCapa();
+}
+function cierraPosF(){ $("posF").classList.remove("on"); }
+function pintaDir(){ $("pfL").classList.toggle("on", posDir === "L"); $("pfC").classList.toggle("on", posDir === "C"); }
+$("pfL").onclick = () => { posDir = "L"; pintaDir(); };
+$("pfC").onclick = () => { posDir = "C"; pintaDir(); };
+$("pfCancela").onclick = () => { cierraPosF(); cierraCapa(); };
+$("posF").onclick = e => { if (e.target.id === "posF"){ cierraPosF(); cierraCapa(); } };
+async function ultimoPrecio(sim){
+  const d = await leeVelas(sim), tf = d.tf || {};
+  let mejor = null;
+  for (const k of Object.keys(tf)){ const v = tf[k][tf[k].length - 1]; if (v && (!mejor || v[0] > mejor.t)) mejor = {t: v[0], c: v[4], dur: (+k) * 60}; }
+  return mejor ? {precio: mejor.c, t: mejor.t + mejor.dur, guardado: d.actualizado} : null;
+}
+$("pfUlt").onclick = async () => {
+  if (!store("bolsa_llave")){ toast("Para leer el precio pon tu llave de GitHub en ⚙️", 4000); return; }
+  try{ const u = await ultimoPrecio($("pfMer").value); if (u){ $("pfPre").value = u.precio; toast("Último precio guardado (" + hace(u.guardado) + ")", 3000); } }
+  catch(e){ toast("No se ha podido leer el precio", 3000); }
+};
+$("pfGuarda").onclick = () => {
+  const num = id => { const v = $(id).value.trim().replace(",", "."); return v === "" ? null : +v; };
+  const precio = num("pfPre");
+  if (!precio || isNaN(precio)){ toast("Pon el precio de entrada", 2500); return; }
+  const sl = num("pfSL"), tp = num("pfTP");
+  if ((sl != null && isNaN(sl)) || (tp != null && isNaN(tp))){ toast("Revisa el stop loss y el take profit", 2500); return; }
+  const hora = $("pfHora").value ? Math.floor(new Date($("pfHora").value).getTime() / 1000) : Math.floor(Date.now() / 1000);
+  const sim = $("pfMer").value;
+  const p = {id: posEdit || String(Date.now()), sim, tv: merDe(sim)[2], dir: posDir, precio, hora, sl, tp};
+  const l = posiciones().filter(x => x.id !== p.id); l.push(p); l.sort((a, b) => b.hora - a.hora);
+  guardaPos(l);
+  cierraPosF(); cierraCapa();
+  toast("Posición guardada: " + merDe(sim)[1] + (posDir === "L" ? " LARGO" : " CORTO"), 3000);
+  if (pantalla === "pPos") pintaPosiciones();
+  if (G && simGraf === sim) abreGraf(simGraf, G.tf, G.cambio, G.titulo, G.tfsPedidas);
+};
+$("abrePos").onclick = () => {
+  if (!elegido) return;
+  const sim = simboloCT(elegido.tv); cierraHoja();
+  abrePosF(MERCADOS.some(m => m[0] === sim) ? sim : null, null);
+};
+$("posNueva").onclick = () => abrePosF(null, null);
+$("bPos").onclick = () => { ir("pPos"); pintaPosiciones(); };
+async function pintaPosiciones(){
+  const l = posiciones(), cont = $("lPos");
+  if (!l.length){ cont.innerHTML = `<div class="vacio" style="margin-bottom:12px">No tienes posiciones apuntadas. Pulsa «Apuntar una posición», o pulsa un mercado en un radar y elige «Apuntar mi posición».</div>`; return; }
+  cont.innerHTML = l.map(p => {
+    const m = merDe(p.sim);
+    return `<div class="posi ${p.dir === "C" ? "c" : ""}" data-id="${p.id}">
+      <div class="t">${esc(m[1])}<b class="${p.dir === "C" ? "c" : "l"}">${p.dir === "C" ? "▼ CORTO" : "▲ LARGO"}</b></div>
+      <div class="d">Entrada ${fmtP(p.precio)} · ${fHora(p.hora)}${p.sl != null ? "<br>Stop loss " + fmtP(p.sl, p.precio) : ""}${p.tp != null ? (p.sl != null ? " · " : "<br>") + "Take profit " + fmtP(p.tp, p.precio) : ""}</div>
+      <div class="r" id="r${p.id}"><small>Calculando…</small></div>
+      <div class="bs"><button data-a="g">📍 Gráfico</button><button data-a="e">✏️ Cambiar</button><button data-a="x">✅ Cerrada</button></div>
+    </div>`;
+  }).join("");
+  cont.querySelectorAll(".posi button").forEach(b => b.onclick = () => {
+    const p = posiciones().find(x => x.id === b.closest(".posi").dataset.id); if (!p) return;
+    if (b.dataset.a === "e") abrePosF(null, p);
+    else if (b.dataset.a === "x"){
+      if (b.dataset.seguro){ guardaPos(posiciones().filter(x => x.id !== p.id)); toast("Posición quitada", 2000); pintaPosiciones(); }
+      else { b.dataset.seguro = 1; b.textContent = "¿Quitar? Pulsa otra vez"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "✅ Cerrada"; } }, 4000); }
+    } else {
+      simTV = p.tv; abreCapa();
+      abreGraf(p.sim, "60", "", merDe(p.sim)[1] + " · H1", []);
+    }
+  });
+  if (!store("bolsa_llave")){ l.forEach(p => { const el = $("r" + p.id); if (el) el.innerHTML = "<small>Pon tu llave de GitHub en ⚙️ para ver el precio</small>"; }); return; }
+  for (const sim of [...new Set(l.map(p => p.sim))]){
+    let u = null; try{ u = await ultimoPrecio(sim); }catch(e){}
+    l.filter(p => p.sim === sim).forEach(p => {
+      const el = $("r" + p.id); if (!el) return;
+      if (!u){ el.innerHTML = "<small>No hay precio guardado de este mercado: ejecuta un radar y vuelve</small>"; return; }
+      const r = resultado(p, u.precio), sg = r.dif >= 0 ? "+" : "−";
+      el.className = "r " + (r.dif >= 0 ? "g" : "p");
+      el.innerHTML = `${sg}${Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2})} %<small>Ahora ${fmtP(u.precio, p.precio)} (${sg}${fmtP(Math.abs(r.dif), p.precio)}) · precio de la última vela guardada ${hace(u.guardado)}. Ejecuta un radar para actualizarlo.</small>`;
+    });
+  }
+}
+// Dibuja en el gráfico las posiciones apuntadas de ese mercado
+function dibujaPosiciones(sim, serie, velas, L){
+  const l = posiciones().filter(p => p.sim === sim); if (!l.length) return "";
+  const marcas = [], ultimo = velas[velas.length - 1].close;
+  let txt = [];
+  for (const p of l){
+    const larga = p.dir === "L";
+    serie.createPriceLine({price: p.precio, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (larga ? "▲ LARGO " : "▼ CORTO ")});
+    if (p.sl != null) serie.createPriceLine({price: p.sl, color: "#E5484D", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "SL"});
+    if (p.tp != null) serie.createPriceLine({price: p.tp, color: "#2FBF71", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "TP"});
+    const tE = aMadrid(p.hora); let v = null;
+    for (const x of velas){ if (x.time <= tE) v = x; else break; }
+    if (v) marcas.push({time: v.time, position: larga ? "belowBar" : "aboveBar", color: "#C9A2FF", shape: larga ? "arrowUp" : "arrowDown", text: "Entrada"});
+    const r = resultado(p, ultimo), sg = r.dif >= 0 ? "+" : "−";
+    txt.push(`📌 Tu posición: ${larga ? "LARGO" : "CORTO"} desde ${fmtP(p.precio)} → ahora ${fmtP(ultimo, p.precio)} (${sg}${Math.abs(r.pct).toLocaleString("es-ES", {maximumFractionDigits: 2})} %).`);
+  }
+  marcas.sort((a, b) => a.time - b.time);
+  serie.setMarkers(marcas);
+  // Que el ajuste automático deje siempre a la vista la entrada, el stop loss y el take profit
+  const precios = l.flatMap(p => [p.precio, p.sl, p.tp]).filter(x => x != null);
+  serie.applyOptions({autoscaleInfoProvider: f => {
+    const r = f(); if (!r || !r.priceRange) return r;
+    r.priceRange.minValue = Math.min(r.priceRange.minValue, ...precios);
+    r.priceRange.maxValue = Math.max(r.priceRange.maxValue, ...precios);
+    return r;
+  }});
+  return txt.join(" ") + " ";
+}
+
 // ---------- Instalar ----------
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").style.display = "block"; });
@@ -968,7 +1173,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.02-1";
+const APP_VERSION = "2026.11.02-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
