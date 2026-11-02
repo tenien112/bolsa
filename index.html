@@ -815,7 +815,7 @@ $("abreGraf").onclick = () => {
   abreGraf(simboloCT(e.tv), TF_NOM[e.tf] ? e.tf : "240", e.cambio, simboloXTB(e.tv) + " · " + nombreTF(TF_NOM[e.tf] ? e.tf : "240"), e.tfs);
 };
 
-// En los radares, los mercados van del cambio más reciente al más antiguo (los que no traen hora, al final del bloque)
+// En radares y robots, los mercados van del cambio más reciente al más antiguo (los que no traen hora, al final del bloque)
 function ordenaPorCambio(ls){
   const t = l => simboloTV(l) ? cambioASeg(horaCambio(l)) : undefined;
   const r = []; let bloque = [];
@@ -823,13 +823,14 @@ function ordenaPorCambio(ls){
     bloque.sort((a, b) => (b.t ?? -Infinity) - (a.t ?? -Infinity) || a.i - b.i);
     r.push(...bloque.map(x => x.l)); bloque = [];
   };
-  ls.forEach((l, i) => { const x = t(l); if (x === undefined){ vuelca(); r.push(l); } else bloque.push({l, t: x, i}); });
+  // Las líneas en blanco (los robots separan cada mercado con una) no cortan el bloque
+  ls.filter(l => l.trim()).forEach((l, i) => { const x = t(l); if (x === undefined){ vuelca(); r.push(l); } else bloque.push({l, t: x, i}); });
   vuelca();
   return r;
 }
 function tarjeta(m, vieja){
   let crudas = (m.message || "").split("\n");
-  if (/RADAR/i.test(m.title || "")) crudas = ordenaPorCambio(crudas);
+  crudas = ordenaPorCambio(crudas);   // radares y robots: del cambio más reciente al más antiguo
   const lineas = crudas.map(l => {
     const cls = /BAJISTA|CORTO|⬇|🔴|baja/i.test(l) ? " b" : /ALCISTA|LARGO|⬆|🟢|sube/i.test(l) ? " a" : "";
     const sim = simboloTV(l), tfm = intervaloTV(l);
@@ -1173,7 +1174,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.02-2";
+const APP_VERSION = "2026.11.02-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
