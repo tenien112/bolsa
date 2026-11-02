@@ -161,6 +161,14 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 .ordenBar button{flex:1;padding:11px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--mut);font:900 13px Archivo,sans-serif;letter-spacing:.5px;cursor:pointer}
 .ordenBar button.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
 .ordenBar button.on::after{content:" ▼"}
+
+.opc.com{border-left-color:var(--azul)}
+.opc.todo{border-left-color:#C9A2FF;background:linear-gradient(90deg,rgba(201,162,255,.12),var(--panel))}
+.votos{display:block;font:500 12px Archivo,sans-serif;color:var(--mut);margin-top:3px;white-space:normal}
+
+#ayuda{position:fixed;z-index:50;max-width:290px;background:#FFF7D6;color:#1A1A1A;border:1px solid var(--oro);border-radius:12px;padding:9px 12px;font:500 13px/1.4 Archivo,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s}
+#ayuda.on{opacity:1;transform:none}
+#ayuda::before{content:"💡 ";}
 </style>
 </head>
 <body>
@@ -174,8 +182,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <div class="grandes">
     <button class="grande g-robot" data-ir="pRobot"><span class="e">🤖</span>ROBOT</button>
     <button class="grande g-radar" data-ir="pRadar"><span class="e">📡</span>RADAR</button>
-    <button class="grande g-comunes" id="bComunes"><span class="e">🤝</span>COMUNES</button>
-    <button class="grande g-comunes" id="bComunes2"><span class="e">🤝</span>COMUNES M5-H4</button>
+    <button class="grande g-comunes" data-ir="pComMenu"><span class="e">🤝</span>COMUNES</button>
     <button class="grande g-pos" id="bPos"><span class="e">📌</span>MIS POSICIONES</button>
   </div>
   <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
@@ -209,9 +216,32 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <button class="btn" id="resRepetir" hidden>🔄 Volver a ejecutar</button>
 </section>
 
+<!-- MENÚ DE COMUNES -->
+<section class="pant" id="pComMenu">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>🤝 COMUNES</h2>
+  <p class="sub">Mercados en los que coinciden radares y robots.</p>
+  <div class="lista">
+    <button class="opc com" id="bComunes">COMUNES RADAR Y BOT<small>RADAR CAMBIO TENDENCIAS + BOT COMPRAVENTA</small></button>
+    <button class="opc com" id="bComunes2">COMUNES M5-H4<small>RADAR M5-M30-H1-H2-H4 + BOT COMPRAVENTA</small></button>
+    <button class="opc todo" id="bTodo">🌐 SUPERCOMÚN<small>Lo que coincide en TODOS los radares y TODOS los robots a la vez</small></button>
+  </div>
+</section>
+
+<!-- SUPERCOMÚN -->
+<section class="pant" id="pTodo">
+  <button class="volver" data-ir="pComMenu">← Volver</button>
+  <h2>🌐 SUPERCOMÚN</h2>
+  <p class="sub">Mercados que van en el mismo sentido en todos los radares y robots que los vigilan (bajista o en CORTO en todos, o alcista o en LARGO en todos).</p>
+  <div class="estado" id="todoEstado"><div class="spin"></div><span>Cargando…</span></div>
+  <div class="ordenBar"><button data-o="a">🔤 MERCADO (A-Z)</button><button data-o="t">🕒 ÚLTIMO CAMBIO</button></div>
+  <div id="todoRes" class="bloque"></div>
+  <button class="btn" id="todoRepetir" hidden>🔄 Volver a comprobar</button>
+</section>
+
 <!-- COMUNES -->
 <section class="pant" id="pComunes">
-  <button class="volver" data-ir="pInicio">← Volver</button>
+  <button class="volver" data-ir="pComMenu">← Volver</button>
   <h2 id="comTit">🤝 COMUNES RADAR Y BOT</h2>
   <p class="sub" id="comSub">Bajistas en el RADAR CAMBIO TENDENCIAS que el BOT COMPRAVENTA tiene en CORTO, y alcistas que tiene en LARGO.</p>
   <div class="estado" id="comEstado"><div class="spin"></div><span>Cargando…</span></div>
@@ -286,6 +316,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   </div>
 </div>
 <div id="toast"></div>
+<div id="ayuda"></div>
 
 <script>
 const REPO = "tenien112/forex-alertas";
@@ -322,7 +353,7 @@ let pantalla = "pInicio", origen = "pInicio";
 function ir(id){
   document.querySelectorAll(".pant").forEach(p => p.classList.toggle("on", p.id === id));
   pantalla = id; window.scrollTo(0,0);
-  if (id !== "pRes" && id !== "pComunes") parar();
+  if (id !== "pRes" && id !== "pComunes" && id !== "pTodo") parar();
 }
 document.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => ir(b.dataset.ir));
 $("resVolver").onclick = () => ir(origen);
@@ -341,6 +372,7 @@ function pintaLista(tipo){
     b.className = "opc" + (tipo === "radar" ? " radar" : "");
     b.dataset.wf = v.wf;
     b.innerHTML = esc(v.n) + "<small>" + esc(v.d) + "</small>";
+    b.dataset.ayuda = "Ejecuta ahora " + v.n + " en GitHub y te enseña su estado actual (" + v.d + "). Para cambiar el orden de la lista, déjalo pulsado un segundo y arrástralo.";
     b.onclick = () => { if (b.dataset.sinClic){ delete b.dataset.sinClic; return; } abrir(v, tipo === "robot" ? "pRobot" : "pRadar"); };
     b.oncontextmenu = e => e.preventDefault();
     arrastrable(b, l, tipo);
@@ -1215,6 +1247,174 @@ pintaOrden();
 // Cada vez que llegan resultados nuevos, se ordenan solos
 ["resAhora", "resGuardado", "comRes"].forEach(id => new MutationObserver(() => ordenaDOM($(id))).observe($(id), {childList: true}));
 
+
+// ---------- SUPERCOMÚN: todos los radares y todos los robots a la vez ----------
+// Sentido de cada línea de estado: ALCISTA o LARGO = +1, BAJISTA o CORTO = -1, nada = 0
+function sentidos(msg){
+  const o = {};
+  (msg || "").split("\n").forEach(l => {
+    const x = l.match(/^\s*([A-Za-zÁÉÍÓÚÑáéíóúñ\/ ]{3,25}):\s*(.+)$/); if (!x) return;
+    const r = x[2].replace(/̲/g, "");
+    const d = /\bALCISTA\b|\bLARGO\b/.test(r) ? 1 : /\bBAJISTA\b|\bCORTO\b/.test(r) ? -1 : 0;
+    o[normaliza(x[1])] = {nombre: x[1].trim(), d, linea: l.trim(), cambio: horaCambio(l)};
+  });
+  return o;
+}
+const TODOS = () => [...VIG.radar.map(v => ({...v, tipo: "radar"})), ...VIG.robot.map(v => ({...v, tipo: "robot"}))];
+function pintaTodo(estados, etiqueta){
+  // estados: [{v, m}] con el último mensaje (unido) de cada vigilante
+  const mer = {};
+  estados.forEach(({v, m}) => {
+    const s = sentidos(m.message);
+    Object.keys(s).forEach(k => { (mer[k] = mer[k] || {nombre: s[k].nombre, votos: []}).votos.push({v, ...s[k]}); });
+  });
+  const todos = [], casi = [];
+  Object.values(mer).forEach(x => {
+    const n = x.votos.length; if (n < 2) return;
+    const d = x.votos[0].d;
+    const iguales = x.votos.filter(o => o.d === d && d !== 0).length;
+    const hayRadar = x.votos.some(o => o.v.tipo === "radar"), hayRobot = x.votos.some(o => o.v.tipo === "robot");
+    if (iguales === n && hayRadar && hayRobot) todos.push({...x, d});
+    else if (n >= 3){
+      // Le falta solo uno: todos menos uno en el mismo sentido
+      for (const dd of [1, -1]){
+        const a = x.votos.filter(o => o.d === dd);
+        if (a.length === n - 1) casi.push({...x, d: dd, falla: x.votos.find(o => o.d !== dd)});
+      }
+    }
+  });
+  const ultimo = x => { const t = x.votos.map(o => ({o, t: cambioASeg(o.cambio)})).filter(z => z.t != null).sort((a, b) => b.t - a.t)[0]; return t ? t.o.cambio : ""; };
+  const fila = (x, extra) => {
+    const sim = simboloTV(x.nombre), cls = x.d < 0 ? "b" : "a", c = ultimo(x);
+    const lineaR = (x.votos.find(o => o.v.tipo === "radar") || x.votos[0]).linea;
+    return `<div class="lin ${cls}${sim ? " tv" : ""}"${sim ? ` data-tv="${sim}" data-tf="${intervaloTV(lineaR)}" data-cambio="${c}"` : ""}><b>${esc(x.nombre)}</b>: ${x.d < 0 ? "BAJISTA / CORTO" : "ALCISTA / LARGO"} en ${x.votos.length - (extra ? 1 : 0)} de ${x.votos.length}${c ? " · último cambio " + esc(c) : ""}<span class="votos">${extra ? "Falla: " + esc(extra.falla.v.n) + "<br>" : ""}${x.votos.map(o => esc(o.v.n)).join(" · ")}</span></div>`;
+  };
+  const grupo = (tit, l, cls, extra) => `<div class="grupo ${cls}"><div class="t">${tit} (${l.length})</div>${l.length ? l.map(x => fila(x, extra && x)).join("") : `<div class="vacio">Ninguno ahora mismo.</div>`}</div>`;
+  $("todoRes").innerHTML = `<p class="etq">${etiqueta}</p>`
+    + grupo("🔴 BAJISTAS / CORTO EN TODOS", todos.filter(x => x.d < 0), "b")
+    + grupo("🟢 ALCISTAS / LARGO EN TODOS", todos.filter(x => x.d > 0), "a")
+    + `<div class="grupo"><div class="t">🟡 LES FALTA SOLO UNO (${casi.length})</div>${casi.length ? casi.map(x => fila(x, x)).join("") : `<div class="vacio">Ninguno ahora mismo.</div>`}</div>`
+    + `<p class="nota">Vigilantes leídos (${estados.length} de ${TODOS().length}): ${estados.map(({v, m}) => esc(v.n) + " " + hace(m.time)).join(" · ")}.<br>Solo cuentan los vigilantes que vigilan ese mercado (las materias primas no están en los radares de divisas). Pulsa un mercado para abrirlo.</p>`;
+  return todos.length;
+}
+function estado3(txt, tipo){
+  const el = $("todoEstado"); el.className = "estado" + (tipo ? " " + tipo : "");
+  el.innerHTML = (tipo ? (tipo === "ok" ? "✅" : "⚠️") : '<div class="spin"></div>') + `<span>${txt}</span>`;
+}
+async function comunesTodo(){
+  parar(); actual = "todo";
+  $("todoRes").innerHTML = ""; $("todoRepetir").hidden = true;
+  ir("pTodo");
+  const lista = TODOS();
+  estado3("Buscando el último estado de todos los radares y robots…");
+  try{
+    const ms = await leerNtfy("24h");
+    const est = lista.map(v => ({v, m: ultimoEstado(ms, v)})).filter(x => x.m);
+    if (est.length) pintaTodo(est, "Con el último estado guardado de cada uno");
+  }catch(e){}
+  if (actual !== "todo") return;
+  if (!store("bolsa_llave")){ estado3("Esto es con lo último guardado. Para comprobarlo al momento, pon tu llave en ⚙️", "mal"); return; }
+  const t0 = Math.floor(Date.now()/1000) - 5;
+  estado3(`Ejecutando los ${lista.length} vigilantes a la vez…`);
+  const lanzados = (await Promise.all(lista.map(v => disparar(v.wf).then(() => v).catch(() => null)))).filter(Boolean);
+  if (!lanzados.length){ estado3("No se ha podido ejecutar ninguno: revisa la llave en ⚙️", "mal"); $("todoRepetir").hidden = false; return; }
+  const inicio = Date.now();
+  let llegados = 0;
+  reloj = setInterval(() => {
+    const s = Math.round((Date.now() - inicio)/1000);
+    estado3(`Ejecutando en GitHub… ${llegados} de ${lanzados.length} recibidos · ${s} s (suele tardar 1-2 min)`);
+  }, 1000);
+  sondeo = setInterval(async () => {
+    if (actual !== "todo") return parar();
+    try{
+      const ms = await leerNtfy(t0);
+      const listos = lanzados.filter(v => ms.filter(m => deVig(m, v) && esEstado(m)).length >= v.partes);
+      if (listos.length !== llegados){
+        llegados = listos.length;
+        // Los que ya han contestado, con el estado de ahora; el resto, con el último guardado
+        const viejos = await leerNtfy("24h").catch(() => []);
+        const est = lista.map(v => { const n = listos.includes(v) ? ultimoEstado(ms, v) : null; return {v, m: n || ultimoEstado(viejos, v)}; }).filter(x => x.m);
+        pintaTodo(est, llegados === lanzados.length ? "Ahora mismo" : `Actualizándose: ${llegados} de ${lanzados.length} al momento, el resto con lo último guardado`);
+      }
+      if (llegados === lanzados.length){
+        parar(); estado3("Todos los vigilantes han contestado", "ok"); $("todoRepetir").hidden = false;
+        if (navigator.vibrate) navigator.vibrate(80); return;
+      }
+    }catch(e){}
+    if (Date.now() - inicio > 5*60*1000){ parar(); estado3(`Han contestado ${llegados} de ${lanzados.length} en 5 minutos. Lo que falta va con lo último guardado.`, "mal"); $("todoRepetir").hidden = false; }
+  }, 5000);
+}
+$("bTodo").onclick = comunesTodo;
+$("todoRepetir").onclick = comunesTodo;
+new MutationObserver(() => ordenaDOM($("todoRes"))).observe($("todoRes"), {childList: true});
+
+
+// ---------- Viñetas de ayuda: al dejar el ratón un momento sobre un botón sale qué hace ----------
+const AYUDA = {
+  "#bLlave": "Ajustes: guardar, cambiar o borrar la llave de GitHub. Con ella la app ejecuta los vigilantes al momento y enseña los gráficos.",
+  '#pInicio [data-ir="pRobot"]': "Abre la lista de ROBOTS (BOT COMPRAVENTA y BOT COMMODITIES). Pulsas uno, se ejecuta en GitHub y ves qué tiene abierto en cada mercado: LARGO, CORTO o nada.",
+  '#pInicio [data-ir="pRadar"]': "Abre la lista de RADARES de tendencia. Pulsas uno, se ejecuta y ves el signo (+ o -) de cada temporalidad en cada mercado y si está ALCISTA o BAJISTA.",
+  '#pInicio [data-ir="pComMenu"]': "Abre el menú de COMUNES: los mercados en los que coinciden radares y robots (COMUNES RADAR Y BOT, COMUNES M5-H4 y SUPERCOMÚN).",
+  "#bPos": "MIS POSICIONES: las posiciones que apuntes a mano. Ves lo que va ganando o perdiendo cada una y salen dibujadas en el gráfico de la app.",
+  "#install": "Instala BOLSA-LORENCITO como una aplicación más, con su icono.",
+  ".volver": "Vuelve a la pantalla anterior.",
+  "#bComunes": "Ejecuta el RADAR CAMBIO TENDENCIAS y el BOT COMPRAVENTA y te enseña dónde coinciden: mercados BAJISTAS en el radar con el bot en CORTO, y ALCISTAS con el bot en LARGO.",
+  "#bComunes2": "Igual que COMUNES RADAR Y BOT, pero con el RADAR M5-M30-H1-H2-H4 (el del aviso automático al móvil) en lugar del RADAR CAMBIO TENDENCIAS.",
+  "#bTodo": "SUPERCOMÚN: ejecuta a la vez TODOS los radares y TODOS los robots y te enseña los mercados que van en el mismo sentido en todos ellos. Además, los que coinciden en todos menos en uno (y cuál falla).",
+  '.ordenBar [data-o="a"]': "Ordena los mercados por nombre, de la A a la Z (manteniendo los apartados de divisas y materias primas).",
+  '.ordenBar [data-o="t"]': "Ordena todos los mercados juntos por la hora de su último cambio: el más reciente arriba y el más antiguo abajo.",
+  "#resRepetir": "Vuelve a ejecutar este vigilante en GitHub para ver su estado de ahora mismo.",
+  "#comRepetir": "Vuelve a ejecutar el radar y el bot y a buscar las coincidencias.",
+  "#todoRepetir": "Vuelve a ejecutar todos los radares y robots y a buscar lo que coincide en todos.",
+  "#guardaLlave": "Guarda la llave de GitHub en este dispositivo (solo hace falta una vez).",
+  "#borraLlave": "Borra la llave de este dispositivo. La app solo podrá enseñar lo último guardado.",
+  "#abreGraf": "Abre aquí, en la app, el gráfico de velas de este mercado: línea en la hora del último cambio, MACD, tus posiciones y, al tocar una vela, cómo estaba el radar.",
+  "#abreTV": "Abre este mercado en TradingView, en la temporalidad que ha cambiado más recientemente.",
+  "#abreXTBWeb": "Copia el nombre del mercado tal como lo llama XTB y abre XTB en el navegador: pégalo en su buscador.",
+  "#abreXTB": "Copia el nombre del mercado y abre la app de XTB del móvil (en el ordenador abre la web de XTB).",
+  "#abrePos": "Apunta una posición que hayas abierto en este mercado (largo o corto, precio, stop loss y take profit) para verla en el gráfico.",
+  "#abreCT": "Copia el nombre del mercado y abre cTrader: pégalo en su buscador.",
+  "#hojaCerrar": "Cierra esta ventana sin abrir nada.",
+  "#gCerrar": "Cierra el gráfico y vuelve a la lista, dejando marcado con una estrella este mercado.",
+  "#gAuto": "AUTO: las velas se ajustan solas al alto de la pantalla. Quítalo para estirar o encoger el eje de precios a mano.",
+  "#gMacd": "Pone o quita el indicador MACD (12, 26, 9) debajo de las velas.",
+  "#posNueva": "Apunta una posición nueva: mercado, largo o corto, precio, hora, stop loss y take profit.",
+  "#pfL": "Posición de COMPRA: ganas si el precio sube.",
+  "#pfC": "Posición de VENTA: ganas si el precio baja.",
+  "#pfUlt": "Rellena el precio de entrada con el último precio guardado de este mercado.",
+  "#pfGuarda": "Guarda la posición en este dispositivo.",
+  "#pfCancela": "Cierra sin guardar."
+};
+function textoAyuda(el){
+  if (el.dataset.ayuda) return el.dataset.ayuda;
+  for (const sel of Object.keys(AYUDA)) if (el.matches(sel)) return AYUDA[sel];
+  if (el.matches(".lin.tv")) return "Pulsa para elegir dónde abrir este mercado: el gráfico de la app, TradingView, XTB o cTrader. También puedes apuntar tu posición.";
+  if (el.matches("#gTfs button")) return "Cambia el gráfico a velas de " + el.textContent.trim() + ".";
+  if (el.matches(".posi button")) return el.dataset.a === "g" ? "Abre el gráfico de este mercado con tu posición dibujada." : el.dataset.a === "e" ? "Cambia los datos de la posición (por ejemplo, si has movido el stop loss o el take profit en XTB)." : "Quita la posición de la lista cuando la hayas cerrado (pulsa dos veces).";
+  return "";
+}
+// Quitar los «title» para que no salgan dos ayudas a la vez
+document.querySelectorAll("[title]").forEach(el => { if (!el.dataset.ayuda) el.dataset.ayuda = AYUDA["#" + el.id] || el.title; el.removeAttribute("title"); });
+let ayudaT = null, ayudaEl = null;
+const escondeAyuda = () => { clearTimeout(ayudaT); ayudaEl = null; $("ayuda").classList.remove("on"); };
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest("button, .lin.tv");
+  if (el === ayudaEl) return;
+  escondeAyuda();
+  if (!el) return;
+  const txt = textoAyuda(el); if (!txt) return;
+  ayudaEl = el;
+  ayudaT = setTimeout(() => {
+    const a = $("ayuda"); a.textContent = txt; a.classList.add("on");
+    const r = el.getBoundingClientRect(), w = a.offsetWidth, h = a.offsetHeight;
+    let top = r.bottom + 8; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+    a.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+    a.style.top = top + "px";
+  }, 700);
+});
+document.addEventListener("mouseout", e => { if (ayudaEl && !ayudaEl.contains(e.relatedTarget)) escondeAyuda(); });
+["mousedown", "scroll", "keydown", "touchstart"].forEach(ev => window.addEventListener(ev, escondeAyuda, {passive: true, capture: true}));
+
 // ---------- Instalar ----------
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").style.display = "block"; });
@@ -1226,7 +1426,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.02-4";
+const APP_VERSION = "2026.11.02-6";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
