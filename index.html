@@ -127,6 +127,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gAuto{position:absolute;right:4px;bottom:32px;z-index:7;font:700 12px "JetBrains Mono",monospace;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
 #gMacd{position:absolute;right:4px;bottom:66px;z-index:7;font:700 12px "JetBrains Mono",monospace;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
 #gMacd.on{background:#4DA3FF;color:#0E1A14;border-color:#4DA3FF}
+#gZm,#gZp{position:absolute;right:4px;z-index:7;font:700 14px "JetBrains Mono",monospace;width:40px;padding:4px 0;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
+#gZp{bottom:134px}#gZm{bottom:100px}
 #gAuto.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 
@@ -293,7 +295,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 <div id="graf">
   <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
   <div id="gTfs"></div>
-  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button></div>
+  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
   <p id="gNota"></p>
 </div>
 <div id="posF">
@@ -817,6 +819,32 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   }, 50);
   $("gCaja").addEventListener("touchend", revisaAuto);
   $("gCaja").addEventListener("mouseup", revisaAuto);
+  // ZOOM EN ALTURA: botones ↕+ / ↕− y pellizco con los dedos uno encima del otro (el pellizco de lado sigue siendo el horizontal)
+  let zoomV = +(store("bolsa_zoomv") || 1); if (!(zoomV > 0)) zoomV = 1;
+  const base = serie.options().autoscaleInfoProvider;
+  serie.applyOptions({autoscaleInfoProvider: f => {
+    const r = base ? base(f) : f(); if (!r || !r.priceRange) return r;
+    const a = r.priceRange.minValue, b = r.priceRange.maxValue, c = (a + b) / 2, h = (b - a) / 2 / zoomV;
+    r.priceRange.minValue = c - h; r.priceRange.maxValue = c + h;
+    return r;
+  }});
+  const ponZoom = z => {
+    zoomV = Math.min(20, Math.max(0.2, z)); store("bolsa_zoomv", zoomV);
+    chart.priceScale("right").applyOptions({autoScale: true}); store("bolsa_auto", true); pintaAuto();
+  };
+  $("gZp").onclick = () => ponZoom(zoomV * 1.25);
+  $("gZm").onclick = () => ponZoom(zoomV / 1.25);
+  const autoAntes = $("gAuto").onclick;
+  $("gAuto").onclick = () => { if (zoomV !== 1){ ponZoom(1); toast("Altura normal: AUTO", 2000); } else autoAntes(); };
+  let pz = null;
+  const dist = t => ({dx: Math.abs(t[0].clientX - t[1].clientX), dy: Math.abs(t[0].clientY - t[1].clientY)});
+  const caja = $("gCaja");
+  if (caja._zv) caja._zv.forEach(([e, fn]) => caja.removeEventListener(e, fn, true));
+  const zs = e => { if (e.touches.length === 2){ const d = dist(e.touches); pz = d.dy > d.dx * 1.2 ? {dy: Math.max(d.dy, 20), z: zoomV} : null; if (pz){ e.preventDefault(); e.stopPropagation(); } } };
+  const zm = e => { if (pz && e.touches.length === 2){ e.preventDefault(); e.stopPropagation(); ponZoom(pz.z * Math.max(dist(e.touches).dy, 20) / pz.dy); } };
+  const ze = e => { if (pz && e.touches.length < 2){ pz = null; e.stopPropagation(); } };
+  caja._zv = [["touchstart", zs], ["touchmove", zm], ["touchend", ze], ["touchcancel", ze]];
+  caja._zv.forEach(([e, fn]) => caja.addEventListener(e, fn, {capture: true, passive: false}));
   G = {chart, serie, iCambio: null, orig, dur: (+tf) * 60, tf, datos, cambio, titulo, tfsPedidas: tfs,
        tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
   // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
@@ -841,7 +869,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
     if (pe != null){ let k = 0; while (k < n && velas[k].time <= pe) k++; i0 = Math.min(k - 25, n - 90); }
     chart.timeScale().setVisibleLogicalRange({from: Math.max(0, i0), to: n + 4});
   }
-  $("gNota").textContent = notaPos + nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca para ampliar.";
+  $("gNota").textContent = notaPos + nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca de lado para ampliar a lo ancho. Para la altura: botones ↕+ / ↕− o pellizca con los dedos uno encima del otro (AUTO lo deja como estaba).";
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -1377,6 +1405,8 @@ const AYUDA = {
   "#hojaCerrar": "Cierra esta ventana sin abrir nada.",
   "#gCerrar": "Cierra el gráfico y vuelve a la lista, dejando marcado con una estrella este mercado.",
   "#gAuto": "AUTO: las velas se ajustan solas al alto de la pantalla. Quítalo para estirar o encoger el eje de precios a mano.",
+  "#gZp": "Estira las velas en altura (más zoom vertical). También: pellizca con los dedos uno encima del otro.",
+  "#gZm": "Encoge las velas en altura (menos zoom vertical). AUTO lo devuelve a su alto normal.",
   "#gMacd": "Pone o quita el indicador MACD (12, 26, 9) debajo de las velas.",
   "#posNueva": "Apunta una posición nueva: mercado, largo o corto, precio, hora, stop loss y take profit.",
   "#pfL": "Posición de COMPRA: ganas si el precio sube.",
@@ -1426,7 +1456,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.02-6";
+const APP_VERSION = "2026.11.03-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
