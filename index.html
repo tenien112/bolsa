@@ -141,12 +141,12 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gPL .pl .v{flex:1;line-height:1.2;white-space:nowrap}#gPL .pl .v small{font:500 10px Archivo,sans-serif;color:var(--mut);margin-left:4px}
 #gPL .g{color:var(--verde)}#gPL .p{color:var(--rojo)}
 #gPL .pl button{font:900 10px Archivo,sans-serif;padding:3px 5px;border-radius:5px;border:0;background:var(--oro);color:#0E1A14;cursor:pointer;white-space:nowrap}
-#gOp{display:flex;gap:6px;margin-top:8px;align-items:stretch}
-#gOp button{flex:1;padding:12px 0;border-radius:12px;border:0;font:900 17px Archivo,sans-serif;cursor:pointer}
+#gOp{display:flex;gap:5px;margin-top:5px;align-items:stretch}
+#gOp button{flex:1;padding:5px 0;border-radius:8px;border:0;font:900 12px Archivo,sans-serif;cursor:pointer}
 #gOp .l{background:var(--verde);color:#0E1A14}#gOp .c{background:var(--rojo);color:#fff}
-#gOp button.seg2{outline:3px solid var(--oro);outline-offset:-3px}
-#gOp label{display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 11px Archivo,sans-serif;color:var(--mut);gap:2px}
-#gOp input{width:66px;margin:0;padding:6px 4px;text-align:center;font:700 15px "JetBrains Mono",monospace}
+#gOp button.seg2{outline:2px solid var(--oro);outline-offset:-2px}
+#gOp label{display:flex;flex-direction:row;align-items:center;justify-content:center;font:700 9px Archivo,sans-serif;color:var(--mut);gap:3px}
+#gOp input{width:48px;margin:0;padding:3px 2px;text-align:center;font:700 12px "JetBrains Mono",monospace;border-radius:6px}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 
 .g-pos{background:#C9A2FF}
@@ -1590,7 +1590,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-6";
+const APP_VERSION = "2026.11.04-7";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
