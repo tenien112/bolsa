@@ -113,8 +113,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gTfs button.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
 #gCaja{position:relative;flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 #gLinea{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--oro);pointer-events:none;z-index:5;display:none}
-#gEtq{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
-#gSig{position:absolute;top:34px;left:5px;display:flex;flex-direction:column;gap:1px;background:rgba(14,26,20,.85);border:1px solid var(--oro);border-radius:7px;padding:3px 5px;font:700 11px "JetBrains Mono",monospace;line-height:1.3;white-space:nowrap}
+#gEtq{position:absolute;top:calc(6px + var(--plh,0px));left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
+#gSig{position:absolute;top:calc(34px + var(--plh,0px));left:5px;display:flex;flex-direction:column;gap:1px;background:rgba(14,26,20,.85);border:1px solid var(--oro);border-radius:7px;padding:3px 5px;font:700 11px "JetBrains Mono",monospace;line-height:1.3;white-space:nowrap}
 #gSig:empty{display:none}#gSig.izq{left:auto;right:5px}
 #gSig .p{color:#2FBF71}#gSig .n{color:#E5484D}#gSig .z{color:var(--mut)}#gSig .u{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:2px}
 #gRadar{position:absolute;top:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
@@ -133,12 +133,12 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gZm,#gZp{position:absolute;right:4px;z-index:7;font:700 14px "JetBrains Mono",monospace;width:40px;padding:4px 0;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
 #gZp{bottom:134px}#gZm{bottom:100px}
 #gAuto.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
-#gPL{position:absolute;left:4px;top:4px;z-index:7;display:none;flex-direction:column;gap:4px;max-width:78%}
-#gPL .pl{display:flex;align-items:center;gap:6px;background:rgba(14,26,20,.92);border:1px solid var(--line);border-left:5px solid var(--verde);border-radius:9px;padding:5px 6px 5px 8px;font:700 13px "JetBrains Mono",monospace}
+#gPL{position:absolute;left:4px;top:4px;z-index:7;display:none;flex-direction:column;gap:3px;max-width:70%}
+#gPL .pl{display:flex;align-items:center;gap:6px;background:rgba(14,26,20,.92);border:1px solid var(--line);border-left:3px solid var(--verde);border-radius:7px;padding:2px 3px 2px 6px;font:700 11px "JetBrains Mono",monospace;opacity:.9}
 #gPL .pl.c{border-left-color:var(--rojo)}
-#gPL .pl .v{flex:1;line-height:1.25}#gPL .pl .v small{display:block;font:500 10.5px Archivo,sans-serif;color:var(--mut)}
+#gPL .pl .v{flex:1;line-height:1.2;white-space:nowrap}#gPL .pl .v small{font:500 10px Archivo,sans-serif;color:var(--mut);margin-left:4px}
 #gPL .g{color:var(--verde)}#gPL .p{color:var(--rojo)}
-#gPL .pl button{font:900 12px Archivo,sans-serif;padding:7px 8px;border-radius:7px;border:0;background:var(--oro);color:#0E1A14;cursor:pointer;white-space:nowrap}
+#gPL .pl button{font:900 10px Archivo,sans-serif;padding:3px 5px;border-radius:5px;border:0;background:var(--oro);color:#0E1A14;cursor:pointer;white-space:nowrap}
 #gOp{display:flex;gap:6px;margin-top:8px;align-items:stretch}
 #gOp button{flex:1;padding:12px 0;border-radius:12px;border:0;font:900 17px Archivo,sans-serif;cursor:pointer}
 #gOp .l{background:var(--verde);color:#0E1A14}#gOp .c{background:var(--rojo);color:#fff}
@@ -1282,15 +1282,16 @@ function cierraPos(p, precio){
 }
 // Recuadro en el gráfico: lo que va ganando o perdiendo cada posición abierta de este mercado, con botón CERRAR
 function pintaPL(){
-  const caja = $("gPL"); if (!G || !simGraf){ caja.style.display = "none"; return; }
+  const caja = $("gPL"); if (!G || !simGraf){ caja.style.display = "none"; $("gCaja").style.setProperty("--plh", "0px"); return; }
   const l = posiciones().filter(p => p.sim === simGraf);
-  if (!l.length){ caja.style.display = "none"; caja.innerHTML = ""; return; }
+  if (!l.length){ caja.style.display = "none"; caja.innerHTML = ""; $("gCaja").style.setProperty("--plh", "0px"); return; }
   const precio = G.ultimo;
   caja.innerHTML = l.map(p => {
     const r = resultado(p, precio), d = dinero(p, precio), cl = r.dif >= 0 ? "g" : "p", sg = r.dif >= 0 ? "+" : "−";
-    return `<div class="pl ${p.dir === "C" ? "c" : ""}" data-id="${p.id}"><div class="v">${p.dir === "L" ? "▲" : "▼"} <span class="${cl}">${d ? fDin(d) : sg + Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " %"}</span><small>${p.lote != null ? "lote " + String(p.lote).replace(".", ",") + " · " : ""}${sg}${Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2})} % · desde ${fmtP(p.precio)}</small></div><button>CERRAR</button></div>`;
+    return `<div class="pl ${p.dir === "C" ? "c" : ""}" data-id="${p.id}"><div class="v">${p.dir === "L" ? "▲" : "▼"} <span class="${cl}">${d ? fDin(d) : sg + Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " %"}</span><small>${p.lote != null ? String(p.lote).replace(".", ",") + " · " : ""}${fmtP(p.precio)}</small></div><button>CERRAR</button></div>`;
   }).join("");
   caja.style.display = "flex";
+  $("gCaja").style.setProperty("--plh", (caja.offsetHeight + 4) + "px");
   caja.querySelectorAll(".pl button").forEach(b => b.onclick = e => {
     e.stopPropagation();
     const p = posiciones().find(x => x.id === b.closest(".pl").dataset.id); if (!p) return;
@@ -1313,12 +1314,12 @@ function dibujaPosiciones(sim, serie, velas, L){
   let txt = [];
   for (const p of l){
     const larga = p.dir === "L";
-    serie.createPriceLine({price: p.precio, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (larga ? "▲ LARGO " : "▼ CORTO ") + (p.lote != null ? String(p.lote).replace(".", ",") : "")});
-    if (p.sl != null) serie.createPriceLine({price: p.sl, color: "#E5484D", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "SL"});
-    if (p.tp != null) serie.createPriceLine({price: p.tp, color: "#2FBF71", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "TP"});
+    serie.createPriceLine({price: p.precio, color: "#C9A2FF", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: larga ? "▲" : "▼"});
+    if (p.sl != null) serie.createPriceLine({price: p.sl, color: "#E5484D", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "SL"});
+    if (p.tp != null) serie.createPriceLine({price: p.tp, color: "#2FBF71", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "TP"});
     const tE = aMadrid(p.hora); let v = null;
     for (const x of velas){ if (x.time <= tE) v = x; else break; }
-    if (v) marcas.push({time: v.time, position: larga ? "belowBar" : "aboveBar", color: "#C9A2FF", shape: larga ? "arrowUp" : "arrowDown", text: "Entrada"});
+    if (v) marcas.push({time: v.time, position: larga ? "belowBar" : "aboveBar", color: "#C9A2FF", shape: larga ? "arrowUp" : "arrowDown", text: "", size: 0.6});
     const r = resultado(p, ultimo), sg = r.dif >= 0 ? "+" : "−";
     txt.push(`📌 Tu posición: ${larga ? "LARGO" : "CORTO"} desde ${fmtP(p.precio)} → ahora ${fmtP(ultimo, p.precio)} (${sg}${Math.abs(r.pct).toLocaleString("es-ES", {maximumFractionDigits: 2})} %).`);
   }
@@ -1564,7 +1565,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-2";
+const APP_VERSION = "2026.11.04-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
