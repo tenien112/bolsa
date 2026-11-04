@@ -717,6 +717,7 @@ function cierraGraf(){
   $("graf").classList.remove("on");
   if (abierto && simTV){ const x = simTV; marcaVisto(x); setTimeout(() => irAlVisto(x), 50); }
   if (G && G.chart) G.chart.remove();
+  grafSeq++; limpiaCaja();
   G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none"; $("gSig").innerHTML = "";
 }
 function colocaLinea(){
@@ -816,7 +817,10 @@ function calculaMACD(cierres, r = 12, l = 26, s = 9){
   const h = macd.map((x, i) => x != null && sen[i] != null ? x - sen[i] : null);
   return {macd, sen, h};
 }
+let grafSeq = 0;   // cada apertura del gráfico tiene su número: si llega tarde una carga vieja, se descarta
+function limpiaCaja(){ document.querySelectorAll("#gCaja .tv-lightweight-charts").forEach(e => e.remove()); }
 async function abreGraf(sim, tf, cambio, titulo, tfs){
+  const miSeq = ++grafSeq;
   try{ marcaPosB(); $("gPosL").classList.remove("on"); }catch(e){}
   if (G && G.chart) G.chart.remove();
   G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none"; $("gSig").innerHTML = "";
@@ -835,7 +839,9 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
       : e.message === "libreria" ? "No se ha podido cargar el gráfico (¿sin conexión?)." : "No se han podido leer las velas: " + e.message;
     return;
   }
-  if (!$("graf").classList.contains("on")) return;
+  if (!$("graf").classList.contains("on") || miSeq !== grafSeq) return;
+  if (G && G.chart) G.chart.remove();
+  limpiaCaja();   // nunca dos gráficos montados a la vez
   if (!TF_NOM[tf]) tf = "240";
   const crudas = (datos.tf || {})[tf] || [];
   const velas = [], orig = new Map(); let ant = -Infinity;
@@ -1673,7 +1679,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-17";
+const APP_VERSION = "2026.11.04-18";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
