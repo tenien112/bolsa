@@ -119,15 +119,15 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gSig .p{color:#2FBF71}#gSig .n{color:#E5484D}#gSig .z{color:var(--mut)}
 #gSig span{text-decoration:underline;text-decoration-color:currentColor}#gSig .s1{text-decoration-thickness:2px;text-underline-offset:1px}#gSig .s2{text-decoration-thickness:1px;text-underline-offset:1px}#gSig .s3{text-decoration-thickness:1px;text-underline-offset:1px}
 #gSig{padding-right:14px}#gSig svg{position:absolute;right:1px;top:0;width:12px;height:100%;color:var(--oro);overflow:visible;pointer-events:none}
-#gRadar{position:absolute;top:calc(2px + var(--plh,0px));left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:7px;padding:2px 5px 3px;font:700 9px "JetBrains Mono",monospace;line-height:1.3;pointer-events:none}
-#gRadar small{display:block;color:var(--mut);font-size:8px;font-weight:400}
+#gRadar{position:absolute;top:calc(2px + var(--plh,0px));left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:7px;padding:1px 4px 2px;font:700 8px "JetBrains Mono",monospace;line-height:1.3;pointer-events:none}
+#gRadar small{display:block;color:var(--mut);font-size:7px;font-weight:400}
 #gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
-#gRadar .tfs{position:relative;display:inline-block;padding-top:9px;white-space:pre}
-#gRadar svg.arc{position:absolute;left:0;top:0;height:9px;color:var(--oro);overflow:visible;pointer-events:none}
+#gRadar .tfs{position:relative;display:inline-block;padding-top:7px;white-space:pre}
+#gRadar svg.arc{position:absolute;left:0;top:0;height:7px;color:var(--oro);overflow:visible;pointer-events:none}
 #gRadar u{text-decoration-color:currentColor}
-#gRadar u.s1{text-decoration-thickness:3px;text-underline-offset:3px}
-#gRadar u.s2{text-decoration-thickness:2px;text-underline-offset:3px}
-#gRadar u.s3{text-decoration-thickness:1px;text-underline-offset:2px}
+#gRadar u.s1{text-decoration-thickness:2px;text-underline-offset:2px}
+#gRadar u.s2{text-decoration-thickness:1.5px;text-underline-offset:2px}
+#gRadar u.s3{text-decoration-thickness:1px;text-underline-offset:1px}
 #gRadar b.a{color:#0E1A14;background:#2FBF71;border-radius:4px;padding:0 3px;font-size:9px}#gRadar b.b{color:#fff;background:#E5484D;border-radius:4px;padding:0 3px;font-size:9px}
 #gAuto{position:absolute;right:4px;bottom:32px;z-index:7;font:700 12px "JetBrains Mono",monospace;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
 #gMacd{position:absolute;right:4px;bottom:66px;z-index:7;font:700 12px "JetBrains Mono",monospace;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
@@ -492,12 +492,13 @@ function hace(ts){
 // Orden fijo de las temporalidades. Flechas en arco por encima: de la más antigua a la inmediatamente más reciente,
 // más fina la que sale de lo antiguo y más gorda la que llega a lo más reciente. Monoespaciada: 1 carácter = 10 unidades del dibujo.
 const TOK = String.raw`\[+(?:M|H|D|W)\d+[+\-.]\]+`;
+let ARC_K = 1;   // grosor de las flechas (más finas en el recuadro de la vela tocada)
 function arcos(it){
   let x = 0; it.forEach(o => { o.c = (x + o.tf.length / 2) * 10; x += o.tf.length + 1; });
   const W = (x - 1) * 10, rangos = [...new Set(it.map(o => o.n))].sort((a, b) => b - a), SX = 0.82;
   let d = "";
   for (let i = 1; i < rangos.length; i++){
-    const w = [3.6, 2.2, 1.2, 0.8][Math.min(rangos[i], 4) - 1];
+    const w = [3.6, 2.2, 1.2, 0.8][Math.min(rangos[i], 4) - 1] * ARC_K;
     for (const o of it.filter(o => o.n === rangos[i - 1])) for (const q of it.filter(o => o.n === rangos[i])){
       const dr = q.c > o.c ? 1 : -1, x1 = o.c + dr * 10, x2 = q.c - dr * 4, dist = Math.abs(x2 - x1) / 10, cy = 2 - 1.5 * dist, mx = (x1 + x2) / 2;
       let ux = (x2 - mx) * SX, uy = 18 - cy; const L = Math.hypot(ux, uy); ux /= L; uy /= L;
@@ -767,7 +768,7 @@ function pintaRadar(tVela, xDedo){
   let txt;
   if (es.every(o => o.e != null)){
     const marcas = es.map(o => { const n = inicios.indexOf(o.d) + 1; return "[".repeat(n) + o.tf + sg(o.e) + "]".repeat(n); }).join(" ");
-    txt = subraya(marcas).replace(/<u class="(s\d)">([^<]*?)([+\-.])<\/u>/g, (m, c, tf, x) => `<u class="${c} ${x === "+" ? "p" : x === "-" ? "n" : "z"}">${tf}${x}</u>`);
+    ARC_K = 0.65; txt = subraya(marcas).replace(/<u class="(s\d)">([^<]*?)([+\-.])<\/u>/g, (m, c, tf, x) => `<u class="${c} ${x === "+" ? "p" : x === "-" ? "n" : "z"}">${tf}${x}</u>`); ARC_K = 1;
   } else txt = es.map(o => o.e == null ? `<span class="z">${o.tf}?</span>` : `<span class="${o.e > 0 ? "p" : o.e < 0 ? "n" : "z"}">${o.tf}${sg(o.e)}</span>`).join(" ");
   const todos = es.length && es.every(o => o.e === es[0].e) ? es[0].e : 0;
   const g = todos > 0 ? ' <b class="a">ALCISTA</b>' : todos < 0 ? ' <b class="b">BAJISTA</b>' : "";
@@ -1590,7 +1591,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-12";
+const APP_VERSION = "2026.11.04-13";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
