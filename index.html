@@ -114,6 +114,9 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gCaja{position:relative;flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 #gLinea{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--oro);pointer-events:none;z-index:5;display:none}
 #gEtq{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--oro);color:#0E1A14;font:700 12px "JetBrains Mono",monospace;padding:2px 6px;border-radius:6px;white-space:nowrap}
+#gSig{position:absolute;top:34px;left:5px;display:flex;flex-direction:column;gap:1px;background:rgba(14,26,20,.85);border:1px solid var(--oro);border-radius:7px;padding:3px 5px;font:700 11px "JetBrains Mono",monospace;line-height:1.3;white-space:nowrap}
+#gSig:empty{display:none}#gSig.izq{left:auto;right:5px}
+#gSig .p{color:#2FBF71}#gSig .n{color:#E5484D}#gSig .z{color:var(--mut)}#gSig .u{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:2px}
 #gRadar{position:absolute;top:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
 #gRadar small{display:block;color:var(--mut);font-size:12px;font-weight:400}
 #gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
@@ -307,7 +310,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 <div id="graf">
   <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
   <div id="gTfs"></div>
-  <div id="gCaja"><div id="gPL"></div><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
+  <div id="gCaja"><div id="gPL"></div><div id="gLinea"><span id="gEtq"></span><div id="gSig"></div></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
   <div id="gOp"><button class="l" id="gLargo">▲ LARGO</button><label>LOTE<input id="gLote" type="number" step="0.01" min="0.01" inputmode="decimal"></label><button class="c" id="gCorto">▼ CORTO</button></div>
   <p id="gNota"></p>
 </div>
@@ -693,7 +696,7 @@ function cierraGraf(){
   $("graf").classList.remove("on");
   if (abierto && simTV){ const x = simTV; marcaVisto(x); setTimeout(() => irAlVisto(x), 50); }
   if (G && G.chart) G.chart.remove();
-  G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
+  G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none"; $("gSig").innerHTML = "";
 }
 function colocaLinea(){
   if (!G || G.iCambio == null) { $("gLinea").style.display = "none"; return; }
@@ -703,6 +706,17 @@ function colocaLinea(){
   const ancho = $("gCaja").clientWidth - G.chart.priceScale("right").width();
   if (x == null || x < 0 || x > ancho) { $("gLinea").style.display = "none"; return; }
   $("gLinea").style.left = x + "px"; $("gLinea").style.display = "block";
+  $("gSig").classList.toggle("izq", x > ancho - 70);   // junto a la línea, por el lado donde quepa
+}
+// Signo de cada temporalidad del radar en el momento del último cambio (en pequeño, junto a la línea amarilla)
+function pintaSignos(tUTC){
+  const caja = $("gSig"), radar = G && G.datos.radar;
+  if (!radar || tUTC == null){ caja.innerHTML = ""; return; }
+  const t = Math.min(tUTC + 240, G.datos.actualizado || tUTC + 240);   // margen por si el radar apuntó el cambio unos segundos/minutos después
+  const es = G.tfs.map(tf => { const r = estadoEn(radar[String(TF_MIN[tf])], t); return {tf, e: r ? r.e : null, d: r ? r.d : null}; });
+  const ult = Math.max(...es.map(o => o.d == null ? -Infinity : o.d));
+  caja.innerHTML = es.map(o => { const c = o.e == null ? "z" : o.e > 0 ? "p" : o.e < 0 ? "n" : "z";
+    return `<span class="${c}${o.d === ult ? " u" : ""}">${o.tf}${o.e == null ? "?" : o.e > 0 ? "+" : o.e < 0 ? "-" : "."}</span>`; }).join("");
 }
 // Cómo estaba el radar al cierre de la vela que se toca con el dedo
 function estadoEn(lista, t){
@@ -760,7 +774,7 @@ function calculaMACD(cierres, r = 12, l = 26, s = 9){
 }
 async function abreGraf(sim, tf, cambio, titulo, tfs){
   if (G && G.chart) G.chart.remove();
-  G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
+  G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none"; $("gSig").innerHTML = "";
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
@@ -874,6 +888,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
     else {
       G.iCambio = i + Math.min(1, (tC - velas[i].time) / dur) - 0.5;   // en el punto exacto de la hora del cambio
       $("gEtq").textContent = cambio;
+      pintaSignos(orig.get(velas[i].time) + (tC - velas[i].time));
       const pasado = tC > velas[n-1].time + dur;
       if (pasado) nota += " El cambio es posterior a la última vela guardada: vuelve a ejecutar el radar para actualizarlas.";
       chart.timeScale().setVisibleLogicalRange({from: Math.max(0, Math.min(i - 25, n - 90)), to: n + 4});
@@ -885,7 +900,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
     if (pe != null){ let k = 0; while (k < n && velas[k].time <= pe) k++; i0 = Math.min(k - 25, n - 90); }
     chart.timeScale().setVisibleLogicalRange({from: Math.max(0, i0), to: n + 4});
   }
-  $("gNota").textContent = notaPos + nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca de lado para ampliar a lo ancho. Para la altura: botones ↕+ / ↕− o pellizca con los dedos uno encima del otro (AUTO lo deja como estaba).";
+  $("gNota").textContent = notaPos + nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Junto a la línea amarilla, el signo de cada temporalidad en el momento del cambio (subrayada la que acaba de cambiar). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca de lado para ampliar a lo ancho. Para la altura: botones ↕+ / ↕− o pellizca con los dedos uno encima del otro (AUTO lo deja como estaba).";
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -1549,7 +1564,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-1";
+const APP_VERSION = "2026.11.04-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
