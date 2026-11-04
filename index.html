@@ -119,11 +119,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gSig .p{color:#2FBF71}#gSig .n{color:#E5484D}#gSig .z{color:var(--mut)}
 #gSig span{text-decoration:underline;text-decoration-color:currentColor}#gSig .s1{text-decoration-thickness:3px;text-underline-offset:3px}#gSig .s2{text-decoration-thickness:2px;text-underline-offset:3px}#gSig .s3{text-decoration-thickness:1px;text-underline-offset:2px}
 #gSig{padding-right:24px}#gSig svg{position:absolute;right:2px;top:0;width:20px;height:100%;color:var(--oro);overflow:visible;pointer-events:none}
-#gRadar{position:absolute;top:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.88);border:1px solid var(--line);border-radius:8px;padding:3px 6px;font:700 11px "JetBrains Mono",monospace;line-height:1.3;pointer-events:none}
-#gRadar .vs{position:relative;display:flex;flex-direction:column;gap:1px;padding-right:24px}#gRadar .vs span{text-decoration:underline;text-decoration-color:currentColor}
-#gRadar .vs .s1{text-decoration-thickness:3px;text-underline-offset:3px}#gRadar .vs .s2{text-decoration-thickness:2px;text-underline-offset:3px}#gRadar .vs .s3{text-decoration-thickness:1px;text-underline-offset:2px}
-#gRadar .vs svg{position:absolute;right:2px;top:0;width:20px;height:100%;color:var(--oro);overflow:visible;pointer-events:none}#gRadar b.a,#gRadar b.b{display:block;margin-top:2px;text-align:center;font-size:10px}
-#gRadar small{display:block;color:var(--mut);font-size:10px;font-weight:400;margin-bottom:1px}
+#gRadar{position:absolute;top:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:600 14px "JetBrains Mono",monospace;line-height:1.45;pointer-events:none}
+#gRadar small{display:block;color:var(--mut);font-size:12px;font-weight:400}
 #gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
 #gRadar .tfs{position:relative;display:inline-block;padding-top:20px;white-space:pre}
 #gRadar svg.arc{position:absolute;left:0;top:0;height:20px;color:var(--oro);overflow:visible;pointer-events:none}
@@ -727,8 +724,8 @@ function pintaSignos(tUTC){
   flechasSig();
 }
 // Flechas en arco por la derecha de la lista: de la más antigua a la inmediatamente más reciente (fina al salir de lo antiguo, gorda al llegar a lo reciente)
-function flechasSig(caja){
-  caja = caja || $("gSig"); const vieja = caja.querySelector("svg"); if (vieja) vieja.remove();
+function flechasSig(){
+  const caja = $("gSig"), vieja = caja.querySelector("svg"); if (vieja) vieja.remove();
   const it = [...caja.querySelectorAll("span")].map(e => ({n: +e.dataset.n, y: e.offsetTop + e.offsetHeight / 2})).filter(o => o.n > 0);
   const H = caja.clientHeight; if (!H || it.length < 2) return;
   const rangos = [...new Set(it.map(o => o.n))].sort((a, b) => b - a);
@@ -767,13 +764,15 @@ function pintaRadar(tVela, xDedo){
   // Igual que en los radares: subrayado y flechas según el orden en que cambió cada temporalidad (1 = la más reciente)
   const inicios = [...new Set(es.filter(o => o.d != null).map(o => o.d))].sort((x, y) => y - x);
   const sg = e => e > 0 ? "+" : e < 0 ? "-" : ".";
-  const txt = '<div class="vs">' + es.map(o => { const c = o.e == null ? "z" : o.e > 0 ? "p" : o.e < 0 ? "n" : "z", n = inicios.indexOf(o.d) + 1;
-    return `<span class="${c}${n ? " s" + Math.min(n, 3) : ""}" data-n="${n}">${o.tf}${o.e == null ? "?" : sg(o.e)}</span>`; }).join("") + "</div>";
+  let txt;
+  if (es.every(o => o.e != null)){
+    const marcas = es.map(o => { const n = inicios.indexOf(o.d) + 1; return "[".repeat(n) + o.tf + sg(o.e) + "]".repeat(n); }).join(" ");
+    txt = subraya(marcas).replace(/<u class="(s\d)">([^<]*?)([+\-.])<\/u>/g, (m, c, tf, x) => `<u class="${c} ${x === "+" ? "p" : x === "-" ? "n" : "z"}">${tf}${x}</u>`);
+  } else txt = es.map(o => o.e == null ? `<span class="z">${o.tf}?</span>` : `<span class="${o.e > 0 ? "p" : o.e < 0 ? "n" : "z"}">${o.tf}${sg(o.e)}</span>`).join(" ");
   const todos = es.length && es.every(o => o.e === es[0].e) ? es[0].e : 0;
-  const g = todos > 0 ? '<b class="a">ALCISTA</b>' : todos < 0 ? '<b class="b">BAJISTA</b>' : "";
-  caja.innerHTML = `<small>Vela ${cuando}</small>${txt}${g}`;
+  const g = todos > 0 ? ' <b class="a">ALCISTA</b>' : todos < 0 ? ' <b class="b">BAJISTA</b>' : "";
+  caja.innerHTML = `<small>Radar al cierre de la vela ${cuando} (${nombreTF(G.tf)})</small>${txt}${g}`;
   caja.style.display = "block";
-  flechasSig(caja.querySelector(".vs"));
   // El recuadro se coloca junto a la vela tocada
   if (xDedo != null){
     const ancho = $("gCaja").clientWidth, w = caja.offsetWidth;
@@ -1591,7 +1590,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-5";
+const APP_VERSION = "2026.11.04-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
