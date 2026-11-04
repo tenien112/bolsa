@@ -105,7 +105,22 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .cambio small{display:block;font:500 13px Archivo,sans-serif;color:var(--mut);margin-bottom:2px}
 #graf{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;padding:max(12px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom))}
 #graf.on{display:flex}
-#graf .cab{display:flex;align-items:center;gap:8px}
+#graf .cab{display:flex;align-items:center;gap:8px;position:relative}
+#gPosB{position:relative}#gPosB i{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:var(--oro);color:#0E1A14;font:700 11px/17px "JetBrains Mono",monospace;font-style:normal;padding:0 3px}
+#gPosL{display:none;position:absolute;top:calc(max(12px,env(safe-area-inset-top)) + 52px);right:10px;left:10px;z-index:20;background:#16261D;border:1px solid var(--oro);border-radius:14px;padding:6px;max-height:60vh;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+#gPosL.on{display:block}
+#graf .cab .ico{width:40px;height:40px;font-size:18px}
+#gPosL .tot,#lHis .tot{font:700 14px "JetBrains Mono",monospace;padding:6px 8px 8px}
+.hg{color:#2FBF71}.hp{color:#E5484D}
+.hisi{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--verde);border-radius:10px;color:var(--txt);padding:9px 10px;margin-bottom:5px;cursor:pointer;font:700 15px Archivo,sans-serif}
+.hisi.c{border-left-color:var(--rojo)}.hisi .f{display:flex;justify-content:space-between;gap:8px}
+.hisi small{font:400 12px "JetBrains Mono",monospace;color:var(--mut)}.hisi .res{font:700 13px "JetBrains Mono",monospace;white-space:nowrap}.hisi .f>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hisi b{white-space:nowrap;font-size:11px;padding:1px 6px;border-radius:5px}.hisi b.l{background:var(--verde);color:#0E1A14}.hisi b.c{background:var(--rojo);color:#fff}
+#gPosL .h{font:700 12px Archivo,sans-serif;color:var(--mut);padding:4px 8px 6px}
+#gPosL button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--verde);border-radius:10px;color:var(--txt);padding:10px;margin-bottom:5px;cursor:pointer;font:700 15px Archivo,sans-serif}
+#gPosL button.c{border-left-color:var(--rojo)}#gPosL button.ya{outline:2px solid var(--oro)}
+#gPosL button span{flex:1}#gPosL button small{font:400 12px "JetBrains Mono",monospace;color:var(--mut)}
+#gPosL b{font-size:11px;padding:1px 6px;border-radius:5px}#gPosL b.l{background:var(--verde);color:#0E1A14}#gPosL b.c{background:var(--rojo);color:#fff}
 #graf h3{flex:1;margin:0;font-size:18px;line-height:1.25}
 #graf h3 small{display:block;color:var(--oro);font-size:14px}
 #gTfs{display:flex;gap:4px;margin:8px 0}
@@ -276,6 +291,8 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <p class="sub">Las posiciones que apuntes aquí (las que abres en XTB o cTrader). Se ven también dibujadas en el gráfico de la app. Se guardan en este móvil.</p>
   <div id="lPos"></div>
   <button class="btn" id="posNueva">➕ Apuntar una posición</button>
+  <button class="btn sec" id="posHis" style="margin-top:10px">📜 Historial: posiciones cerradas</button>
+  <div id="lHis" style="margin-top:12px"></div>
 </section>
 
 <!-- LLAVE -->
@@ -310,7 +327,8 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   </div>
 </div>
 <div id="graf">
-  <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
+  <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gPosB" aria-label="Posiciones abiertas">📌</button><button class="ico" id="gHisB" aria-label="Posiciones cerradas">📜</button><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
+  <div id="gPosL"></div>
   <div id="gTfs"></div>
   <div id="gCaja"><div id="gPL"></div><div id="gLinea"><span id="gEtq"></span><div id="gSig"></div></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
   <div id="gOp"><button class="l" id="gLargo">▲ LARGO</button><label>LOTE<input id="gLote" type="number" step="0.01" min="0.01" inputmode="decimal"></label><button class="c" id="gCorto">▼ CORTO</button></div>
@@ -799,6 +817,7 @@ function calculaMACD(cierres, r = 12, l = 26, s = 9){
   return {macd, sen, h};
 }
 async function abreGraf(sim, tf, cambio, titulo, tfs){
+  try{ marcaPosB(); $("gPosL").classList.remove("on"); }catch(e){}
   if (G && G.chart) G.chart.remove();
   G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none"; $("gSig").innerHTML = "";
   simGraf = sim;
@@ -931,7 +950,66 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
 }
-$("gCerrar").onclick = () => { cierraGraf(); cierraCapa(); };
+$("gCerrar").onclick = () => { $("gPosL").classList.remove("on"); cierraGraf(); cierraCapa(); };
+// Historial de posiciones cerradas (botón 📜 del gráfico y de MIS POSICIONES)
+function htmlHistorial(){
+  const h = store("bolsa_cerradas") || [];
+  if (!h.length) return "";
+  const tot = {}; h.forEach(x => { if (x.dinero != null){ tot[x.mon] = (tot[x.mon] || 0) + x.dinero; } });
+  const gan = h.filter(x => x.pct != null && x.pct >= 0).length, con = h.filter(x => x.pct != null).length;
+  const totTxt = Object.keys(tot).map(m => `<span class="${tot[m] >= 0 ? "hg" : "hp"}">${fDin({v: tot[m], m})}</span>`).join(" · ");
+  return `<div class="tot">Total: ${totTxt || "—"}${con ? ` · ${gan} de ${con} en positivo` : ""}</div>` + h.map((x, i) => {
+    const m = merDe(x.sim), g = x.pct == null ? "" : x.pct >= 0 ? "hg" : "hp";
+    const pct = x.pct == null ? "" : (x.pct >= 0 ? "+" : "−") + Math.abs(x.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " %";
+    return `<button class="hisi ${x.dir === "C" ? "c" : ""}" data-i="${i}"><span class="f"><span>${esc(m[1])} <b class="${x.dir === "C" ? "c" : "l"}">${x.dir === "C" ? "▼ CORTO" : "▲ LARGO"}</b></span><span class="res ${g}">${x.dinero != null ? fDin({v: x.dinero, m: x.mon}) + " · " : ""}${pct}</span></span><small>${x.lote != null ? "Lote " + String(x.lote).replace(".", ",") + " · " : ""}${fmtP(x.precio)} → ${fmtP(x.cierre, x.precio)} · ${fHora(x.hora)} → ${fHora(x.horaCierre)}</small></button>`;
+  }).join("");
+}
+function enlazaHistorial(cont, alAbrir){
+  const h = store("bolsa_cerradas") || [];
+  cont.querySelectorAll(".hisi").forEach(b => b.onclick = () => {
+    const x = h[+b.dataset.i]; if (!x) return; if (alAbrir) alAbrir();
+    simTV = x.tv;
+    abreGraf(x.sim, G && G.tf ? G.tf : "60", "", merDe(x.sim)[1] + " · H1", []);
+  });
+}
+$("gHisB").onclick = () => {
+  const L = $("gPosL");
+  if (L.classList.contains("on") && L.dataset.v === "h"){ L.classList.remove("on"); return; }
+  const t = htmlHistorial();
+  if (!t){ toast("Aún no tienes posiciones cerradas", 2500); return; }
+  L.innerHTML = `<div class="h">POSICIONES CERRADAS · pulsa una para ver su gráfico</div>` + t;
+  enlazaHistorial(L, () => L.classList.remove("on"));
+  L.dataset.v = "h"; L.classList.add("on");
+};
+$("posHis").onclick = () => {
+  const c = $("lHis");
+  if (c.innerHTML){ c.innerHTML = ""; return; }
+  const t = htmlHistorial();
+  c.innerHTML = t || `<div class="vacio">Aún no tienes posiciones cerradas.</div>`;
+  enlazaHistorial(c, () => abreCapa());
+};
+// Botón 📌 del gráfico: lista de posiciones abiertas; al pulsar una se abre su gráfico
+function marcaPosB(){
+  const n = posiciones().length, b = $("gPosB");
+  b.innerHTML = "📌" + (n ? `<i>${n}</i>` : "");
+}
+$("gPosB").onclick = () => {
+  const L = $("gPosL");
+  if (L.classList.contains("on") && L.dataset.v === "a"){ L.classList.remove("on"); return; }
+  L.dataset.v = "a";
+  const l = posiciones();
+  if (!l.length){ toast("No tienes posiciones abiertas apuntadas", 2500); return; }
+  L.innerHTML = `<div class="h">POSICIONES ABIERTAS · pulsa una para ver su gráfico</div>` + l.map(p => {
+    const m = merDe(p.sim);
+    return `<button data-id="${p.id}" class="${p.dir === "C" ? "c" : ""} ${p.sim === simGraf ? "ya" : ""}"><span>${esc(m[1])} <b class="${p.dir === "C" ? "c" : "l"}">${p.dir === "C" ? "▼ CORTO" : "▲ LARGO"}</b></span><small>${p.lote != null ? String(p.lote).replace(".", ",") + " · " : ""}${fmtP(p.precio)}</small></button>`;
+  }).join("");
+  L.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const p = posiciones().find(x => x.id === b.dataset.id); L.classList.remove("on"); if (!p) return;
+    simTV = p.tv;
+    abreGraf(p.sim, G && G.tf ? G.tf : "60", "", merDe(p.sim)[1] + " · H1", []);
+  });
+  L.classList.add("on");
+};
 $("abreGraf").onclick = () => {
   if (!elegido) return;
   const e = elegido; cierraHoja(); abreCapa();   // la hoja deja su sitio en el historial al gráfico
@@ -1237,6 +1315,7 @@ async function pintaPosiciones(){
       <div class="bs"><button data-a="g">📍 Gráfico</button><button data-a="e">✏️ Cambiar</button><button data-a="x">🔒 Cerrar</button></div>
     </div>`;
   }).join("");
+  cont.querySelectorAll(".posi").forEach(d => d.onclick = ev => { if (ev.target.closest("button")) return; d.querySelector('button[data-a="g"]').click(); });
   cont.querySelectorAll(".posi button").forEach(b => b.onclick = () => {
     const p = posiciones().find(x => x.id === b.closest(".posi").dataset.id); if (!p) return;
     if (b.dataset.a === "e") abrePosF(null, p);
@@ -1542,6 +1621,9 @@ const AYUDA = {
   "#gLargo": "Apunta al momento una compra (LARGO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Pulsa dos veces.",
   "#gCorto": "Apunta al momento una venta (CORTO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Pulsa dos veces.",
   "#gLote": "Tamaño del lote que se apunta con LARGO o CORTO. Se queda guardado.",
+  "#gHisB": "Historial: tus posiciones cerradas, con lo ganado o perdido. Pulsa una y se abre su gráfico.",
+  "#posHis": "Historial: tus posiciones cerradas, con lo ganado o perdido y el total.",
+  "#gPosB": "Tus posiciones abiertas: pulsa una y se abre su gráfico.",
   "#gMacd": "Pone o quita el indicador MACD (12, 26, 9) debajo de las velas.",
   "#posNueva": "Apunta una posición nueva: mercado, largo o corto, precio, hora, stop loss y take profit.",
   "#pfL": "Posición de COMPRA: ganas si el precio sube.",
@@ -1591,7 +1673,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-15";
+const APP_VERSION = "2026.11.04-17";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
