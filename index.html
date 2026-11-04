@@ -119,7 +119,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gSig .p{color:#2FBF71}#gSig .n{color:#E5484D}#gSig .z{color:var(--mut)}
 #gSig span{text-decoration:underline;text-decoration-color:currentColor}#gSig .s1{text-decoration-thickness:3px;text-underline-offset:3px}#gSig .s2{text-decoration-thickness:2px;text-underline-offset:3px}#gSig .s3{text-decoration-thickness:1px;text-underline-offset:2px}
 #gSig{padding-right:24px}#gSig svg{position:absolute;right:2px;top:0;width:20px;height:100%;color:var(--oro);overflow:visible;pointer-events:none}
-#gRadar{position:absolute;top:34px;left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:7px;padding:2px 6px 3px;font:700 10px "JetBrains Mono",monospace;line-height:1.3;pointer-events:none}
+#gRadar{position:absolute;top:calc(2px + var(--plh,0px));left:6px;max-width:calc(100% - 70px);width:max-content;z-index:6;display:none;background:rgba(14,26,20,.92);border:1px solid var(--line);border-radius:7px;padding:2px 6px 3px;font:700 10px "JetBrains Mono",monospace;line-height:1.3;pointer-events:none}
 #gRadar small{display:block;color:var(--mut);font-size:9px;font-weight:400}
 #gRadar .p{color:#2FBF71}#gRadar .n{color:#E5484D}#gRadar .z{color:var(--mut)}
 #gRadar .tfs{position:relative;display:inline-block;padding-top:9px;white-space:pre}
@@ -1590,7 +1590,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-7";
+const APP_VERSION = "2026.11.04-8";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
