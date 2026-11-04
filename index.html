@@ -130,6 +130,18 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gZm,#gZp{position:absolute;right:4px;z-index:7;font:700 14px "JetBrains Mono",monospace;width:40px;padding:4px 0;border-radius:7px;border:1px solid var(--line);background:#16261D;color:var(--mut);cursor:pointer}
 #gZp{bottom:134px}#gZm{bottom:100px}
 #gAuto.on{background:var(--oro);color:#0E1A14;border-color:var(--oro)}
+#gPL{position:absolute;left:4px;top:4px;z-index:7;display:none;flex-direction:column;gap:4px;max-width:78%}
+#gPL .pl{display:flex;align-items:center;gap:6px;background:rgba(14,26,20,.92);border:1px solid var(--line);border-left:5px solid var(--verde);border-radius:9px;padding:5px 6px 5px 8px;font:700 13px "JetBrains Mono",monospace}
+#gPL .pl.c{border-left-color:var(--rojo)}
+#gPL .pl .v{flex:1;line-height:1.25}#gPL .pl .v small{display:block;font:500 10.5px Archivo,sans-serif;color:var(--mut)}
+#gPL .g{color:var(--verde)}#gPL .p{color:var(--rojo)}
+#gPL .pl button{font:900 12px Archivo,sans-serif;padding:7px 8px;border-radius:7px;border:0;background:var(--oro);color:#0E1A14;cursor:pointer;white-space:nowrap}
+#gOp{display:flex;gap:6px;margin-top:8px;align-items:stretch}
+#gOp button{flex:1;padding:12px 0;border-radius:12px;border:0;font:900 17px Archivo,sans-serif;cursor:pointer}
+#gOp .l{background:var(--verde);color:#0E1A14}#gOp .c{background:var(--rojo);color:#fff}
+#gOp button.seg2{outline:3px solid var(--oro);outline-offset:-3px}
+#gOp label{display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 11px Archivo,sans-serif;color:var(--mut);gap:2px}
+#gOp input{width:66px;margin:0;padding:6px 4px;text-align:center;font:700 15px "JetBrains Mono",monospace}
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 
 .g-pos{background:#C9A2FF}
@@ -295,7 +307,8 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 <div id="graf">
   <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
   <div id="gTfs"></div>
-  <div id="gCaja"><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
+  <div id="gCaja"><div id="gPL"></div><div id="gLinea"><span id="gEtq"></span></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
+  <div id="gOp"><button class="l" id="gLargo">▲ LARGO</button><label>LOTE<input id="gLote" type="number" step="0.01" min="0.01" inputmode="decimal"></label><button class="c" id="gCorto">▼ CORTO</button></div>
   <p id="gNota"></p>
 </div>
 <div id="posF">
@@ -309,6 +322,8 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
     <input id="pfPre" type="number" step="any" inputmode="decimal" placeholder="Ej. 1.08520">
     <label>Fecha y hora de entrada (hora de Madrid)</label>
     <input id="pfHora" type="datetime-local">
+    <label>Lote</label>
+    <input id="pfLote" type="number" step="0.01" min="0.01" inputmode="decimal" placeholder="0.01">
     <div class="dos">
       <div><label>Stop loss (opcional)</label><input id="pfSL" type="number" step="any" inputmode="decimal"></div>
       <div><label>Take profit (opcional)</label><input id="pfTP" type="number" step="any" inputmode="decimal"></div>
@@ -678,7 +693,7 @@ function cierraGraf(){
   $("graf").classList.remove("on");
   if (abierto && simTV){ const x = simTV; marcaVisto(x); setTimeout(() => irAlVisto(x), 50); }
   if (G && G.chart) G.chart.remove();
-  G = null; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
+  G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
 }
 function colocaLinea(){
   if (!G || G.iCambio == null) { $("gLinea").style.display = "none"; return; }
@@ -745,7 +760,7 @@ function calculaMACD(cierres, r = 12, l = 26, s = 9){
 }
 async function abreGraf(sim, tf, cambio, titulo, tfs){
   if (G && G.chart) G.chart.remove();
-  G = null; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
+  G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none";
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
@@ -845,8 +860,9 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   const ze = e => { if (pz && e.touches.length < 2){ pz = null; e.stopPropagation(); } };
   caja._zv = [["touchstart", zs], ["touchmove", zm], ["touchend", ze], ["touchcancel", ze]];
   caja._zv.forEach(([e, fn]) => caja.addEventListener(e, fn, {capture: true, passive: false}));
-  G = {chart, serie, iCambio: null, orig, dur: (+tf) * 60, tf, datos, cambio, titulo, tfsPedidas: tfs,
+  G = {chart, serie, ultimo, iCambio: null, orig, dur: (+tf) * 60, tf, datos, cambio, titulo, tfsPedidas: tfs,
        tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
+  pintaPL();
   // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
   chart.subscribeCrosshairMove(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
   chart.subscribeClick(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
@@ -1124,6 +1140,7 @@ function abrePosF(sim, p){
   $("pfHora").value = d.toISOString().slice(0, 16);
   $("pfSL").value = p && p.sl != null ? p.sl : "";
   $("pfTP").value = p && p.tp != null ? p.tp : "";
+  $("pfLote").value = p && p.lote != null ? p.lote : loteDef();
   $("posF").classList.add("on"); abreCapa();
 }
 function cierraPosF(){ $("posF").classList.remove("on"); }
@@ -1151,7 +1168,8 @@ $("pfGuarda").onclick = () => {
   if ((sl != null && isNaN(sl)) || (tp != null && isNaN(tp))){ toast("Revisa el stop loss y el take profit", 2500); return; }
   const hora = $("pfHora").value ? Math.floor(new Date($("pfHora").value).getTime() / 1000) : Math.floor(Date.now() / 1000);
   const sim = $("pfMer").value;
-  const p = {id: posEdit || String(Date.now()), sim, tv: merDe(sim)[2], dir: posDir, precio, hora, sl, tp};
+  const lote = num("pfLote");
+  const p = {id: posEdit || String(Date.now()), sim, tv: merDe(sim)[2], dir: posDir, precio, hora, sl, tp, lote: lote && !isNaN(lote) ? lote : null};
   const l = posiciones().filter(x => x.id !== p.id); l.push(p); l.sort((a, b) => b.hora - a.hora);
   guardaPos(l);
   cierraPosF(); cierraCapa();
@@ -1173,17 +1191,17 @@ async function pintaPosiciones(){
     const m = merDe(p.sim);
     return `<div class="posi ${p.dir === "C" ? "c" : ""}" data-id="${p.id}">
       <div class="t">${esc(m[1])}<b class="${p.dir === "C" ? "c" : "l"}">${p.dir === "C" ? "▼ CORTO" : "▲ LARGO"}</b></div>
-      <div class="d">Entrada ${fmtP(p.precio)} · ${fHora(p.hora)}${p.sl != null ? "<br>Stop loss " + fmtP(p.sl, p.precio) : ""}${p.tp != null ? (p.sl != null ? " · " : "<br>") + "Take profit " + fmtP(p.tp, p.precio) : ""}</div>
+      <div class="d">${p.lote != null ? "Lote " + String(p.lote).replace(".", ",") + " · " : ""}Entrada ${fmtP(p.precio)} · ${fHora(p.hora)}${p.sl != null ? "<br>Stop loss " + fmtP(p.sl, p.precio) : ""}${p.tp != null ? (p.sl != null ? " · " : "<br>") + "Take profit " + fmtP(p.tp, p.precio) : ""}</div>
       <div class="r" id="r${p.id}"><small>Calculando…</small></div>
-      <div class="bs"><button data-a="g">📍 Gráfico</button><button data-a="e">✏️ Cambiar</button><button data-a="x">✅ Cerrada</button></div>
+      <div class="bs"><button data-a="g">📍 Gráfico</button><button data-a="e">✏️ Cambiar</button><button data-a="x">🔒 Cerrar</button></div>
     </div>`;
   }).join("");
   cont.querySelectorAll(".posi button").forEach(b => b.onclick = () => {
     const p = posiciones().find(x => x.id === b.closest(".posi").dataset.id); if (!p) return;
     if (b.dataset.a === "e") abrePosF(null, p);
     else if (b.dataset.a === "x"){
-      if (b.dataset.seguro){ guardaPos(posiciones().filter(x => x.id !== p.id)); toast("Posición quitada", 2000); pintaPosiciones(); }
-      else { b.dataset.seguro = 1; b.textContent = "¿Quitar? Pulsa otra vez"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "✅ Cerrada"; } }, 4000); }
+      if (b.dataset.seguro){ (async () => { let u = null; try{ u = await ultimoPrecio(p.sim); }catch(e){} if (u) cierraPos(p, u.precio); else { guardaPos(posiciones().filter(x => x.id !== p.id)); toast("Posición quitada", 2000); } pintaPosiciones(); })(); }
+      else { b.dataset.seguro = 1; b.textContent = "¿Quitar? Pulsa otra vez"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "🔒 Cerrar"; } }, 4000); }
     } else {
       simTV = p.tv; abreCapa();
       abreGraf(p.sim, "60", "", merDe(p.sim)[1] + " · H1", []);
@@ -1197,10 +1215,82 @@ async function pintaPosiciones(){
       if (!u){ el.innerHTML = "<small>No hay precio guardado de este mercado: ejecuta un radar y vuelve</small>"; return; }
       const r = resultado(p, u.precio), sg = r.dif >= 0 ? "+" : "−";
       el.className = "r " + (r.dif >= 0 ? "g" : "p");
-      el.innerHTML = `${sg}${Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2})} %<small>Ahora ${fmtP(u.precio, p.precio)} (${sg}${fmtP(Math.abs(r.dif), p.precio)}) · precio de la última vela guardada ${hace(u.guardado)}. Ejecuta un radar para actualizarlo.</small>`;
+      const d = dinero(p, u.precio);
+      el.innerHTML = `${d ? fDin(d) + " · " : ""}${sg}${Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2})} %<small>Ahora ${fmtP(u.precio, p.precio)} (${sg}${fmtP(Math.abs(r.dif), p.precio)}) · precio de la última vela guardada ${hace(u.guardado)}. Ejecuta un radar para actualizarlo.</small>`;
     });
   }
 }
+// Botones rápidos LARGO / CORTO del gráfico: apuntan al momento una posición con el lote elegido,
+// al último precio guardado y con la hora de ahora (pulsar dos veces para no apuntar sin querer)
+const loteDef = () => store("bolsa_lote") || 0.01;
+$("gLote").value = loteDef();
+$("gLote").onchange = () => { const v = +String($("gLote").value).replace(",", "."); if (v > 0){ store("bolsa_lote", v); toast("Lote guardado: " + String(v).replace(".", ","), 2000); } else $("gLote").value = loteDef(); };
+function rapida(dir, b){
+  if (!G || !simGraf || G.ultimo == null){ toast("Espera a que carguen las velas", 2500); return; }
+  if (!b.dataset.seguro){
+    document.querySelectorAll("#gOp button").forEach(x => { delete x.dataset.seguro; x.classList.remove("seg2"); x.textContent = x.id === "gLargo" ? "▲ LARGO" : "▼ CORTO"; });
+    b.dataset.seguro = 1; b.classList.add("seg2"); b.textContent = "¿" + (dir === "L" ? "LARGO" : "CORTO") + "? Otra vez";
+    setTimeout(() => { if (b.dataset.seguro){ delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? "▲ LARGO" : "▼ CORTO"; } }, 4000);
+    return;
+  }
+  delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? "▲ LARGO" : "▼ CORTO";
+  const v = +String($("gLote").value).replace(",", "."), lote = v > 0 ? v : loteDef();
+  store("bolsa_lote", lote);
+  const sim = simGraf, tv = MERCADOS.some(m => m[0] === sim) ? merDe(sim)[2] : (simTV || merDe(sim)[2]);
+  const p = {id: String(Date.now()), sim, tv, dir, precio: G.ultimo, hora: Math.floor(Date.now() / 1000), sl: null, tp: null, lote};
+  const l = posiciones(); l.push(p); l.sort((a, c) => c.hora - a.hora); guardaPos(l);
+  if (navigator.vibrate) try{ navigator.vibrate(60); }catch(e){}
+  toast((dir === "L" ? "▲ LARGO" : "▼ CORTO") + " apuntado: lote " + String(lote).replace(".", ",") + " a " + fmtP(G.ultimo) + ". Si en XTB entraste a otro precio, cámbialo en MIS POSICIONES.", 4500);
+  abreGraf(simGraf, G.tf, G.cambio, G.titulo, G.tfsPedidas);
+}
+$("gLargo").onclick = function(){ rapida("L", this); };
+// Tamaño de 1 lote en XTB (unidades del activo), para estimar la ganancia o pérdida en dinero
+const TAM_LOTE = {XAUUSD: 100, XAGUSD: 5000, XPTUSD: 100, XPDUSD: 100, USOIL: 1000, BTCUSD: 1, ETHUSD: 1};
+const tamLote = sim => TAM_LOTE[sim] || (/^[A-Z]{6}$/.test(sim) ? 100000 : null);
+function dinero(p, precio){
+  const t = tamLote(p.sim); if (!t || p.lote == null) return null;
+  const dif = p.dir === "L" ? precio - p.precio : p.precio - precio;
+  const mon = /^[A-Z]{6}$/.test(p.sim) && !TAM_LOTE[p.sim] ? p.sim.slice(3) : "USD";
+  let v = dif * t * p.lote, m = mon;
+  if (mon === "USD"){ /* ya en dólares */ }
+  else if (p.sim.startsWith("USD")){ v = v / precio; m = "USD"; }   // p. ej. USDJPY: de yenes a dólares
+  return {v, m};
+}
+const fDin = d => d == null ? "" : (d.v >= 0 ? "+" : "−") + Math.abs(d.v).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " " + d.m;
+function cierraPos(p, precio){
+  const r = resultado(p, precio), d = dinero(p, precio);
+  const h = store("bolsa_cerradas") || [];
+  h.unshift({...p, cierre: precio, horaCierre: Math.floor(Date.now() / 1000), pct: r ? r.pct : null, dinero: d ? d.v : null, mon: d ? d.m : null});
+  store("bolsa_cerradas", h.slice(0, 200));
+  guardaPos(posiciones().filter(x => x.id !== p.id));
+  toast("🔒 Cerrada " + merDe(p.sim)[1] + (p.dir === "L" ? " LARGO" : " CORTO") + " a " + fmtP(precio, p.precio) + (r ? " · " + (r.pct >= 0 ? "+" : "−") + Math.abs(r.pct).toLocaleString("es-ES", {maximumFractionDigits: 2}) + " %" : "") + (d ? " · " + fDin(d) + " aprox." : "") + ". Ciérrala también en XTB.", 5000);
+}
+// Recuadro en el gráfico: lo que va ganando o perdiendo cada posición abierta de este mercado, con botón CERRAR
+function pintaPL(){
+  const caja = $("gPL"); if (!G || !simGraf){ caja.style.display = "none"; return; }
+  const l = posiciones().filter(p => p.sim === simGraf);
+  if (!l.length){ caja.style.display = "none"; caja.innerHTML = ""; return; }
+  const precio = G.ultimo;
+  caja.innerHTML = l.map(p => {
+    const r = resultado(p, precio), d = dinero(p, precio), cl = r.dif >= 0 ? "g" : "p", sg = r.dif >= 0 ? "+" : "−";
+    return `<div class="pl ${p.dir === "C" ? "c" : ""}" data-id="${p.id}"><div class="v">${p.dir === "L" ? "▲" : "▼"} <span class="${cl}">${d ? fDin(d) : sg + Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " %"}</span><small>${p.lote != null ? "lote " + String(p.lote).replace(".", ",") + " · " : ""}${sg}${Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2})} % · desde ${fmtP(p.precio)}</small></div><button>CERRAR</button></div>`;
+  }).join("");
+  caja.style.display = "flex";
+  caja.querySelectorAll(".pl button").forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const p = posiciones().find(x => x.id === b.closest(".pl").dataset.id); if (!p) return;
+    if (!b.dataset.seguro){ b.dataset.seguro = 1; b.textContent = "¿SEGURO?"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "CERRAR"; } }, 4000); return; }
+    cierraPos(p, G.ultimo);
+    abreGraf(simGraf, G.tf, G.cambio, G.titulo, G.tfsPedidas);
+  });
+}
+// Cada minuto, con el gráfico abierto, vuelve a leer el último precio guardado y actualiza el recuadro
+setInterval(async () => {
+  if (!G || !simGraf || !$("graf").classList.contains("on") || !posiciones().some(p => p.sim === simGraf)) return;
+  try{ const u = await ultimoPrecio(simGraf); if (u && G){ G.ultimo = u.precio; pintaPL(); } }catch(e){}
+}, 60000);
+$("gCorto").onclick = function(){ rapida("C", this); };
+
 // Dibuja en el gráfico las posiciones apuntadas de ese mercado
 function dibujaPosiciones(sim, serie, velas, L){
   const l = posiciones().filter(p => p.sim === sim); if (!l.length) return "";
@@ -1208,7 +1298,7 @@ function dibujaPosiciones(sim, serie, velas, L){
   let txt = [];
   for (const p of l){
     const larga = p.dir === "L";
-    serie.createPriceLine({price: p.precio, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (larga ? "▲ LARGO " : "▼ CORTO ")});
+    serie.createPriceLine({price: p.precio, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (larga ? "▲ LARGO " : "▼ CORTO ") + (p.lote != null ? String(p.lote).replace(".", ",") : "")});
     if (p.sl != null) serie.createPriceLine({price: p.sl, color: "#E5484D", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "SL"});
     if (p.tp != null) serie.createPriceLine({price: p.tp, color: "#2FBF71", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "TP"});
     const tE = aMadrid(p.hora); let v = null;
@@ -1407,6 +1497,9 @@ const AYUDA = {
   "#gAuto": "AUTO: las velas se ajustan solas al alto de la pantalla. Quítalo para estirar o encoger el eje de precios a mano.",
   "#gZp": "Estira las velas en altura (más zoom vertical). También: pellizca con los dedos uno encima del otro.",
   "#gZm": "Encoge las velas en altura (menos zoom vertical). AUTO lo devuelve a su alto normal.",
+  "#gLargo": "Apunta al momento una compra (LARGO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Pulsa dos veces.",
+  "#gCorto": "Apunta al momento una venta (CORTO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Pulsa dos veces.",
+  "#gLote": "Tamaño del lote que se apunta con LARGO o CORTO. Se queda guardado.",
   "#gMacd": "Pone o quita el indicador MACD (12, 26, 9) debajo de las velas.",
   "#posNueva": "Apunta una posición nueva: mercado, largo o corto, precio, hora, stop loss y take profit.",
   "#pfL": "Posición de COMPRA: ganas si el precio sube.",
@@ -1456,7 +1549,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.03-1";
+const APP_VERSION = "2026.11.04-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
