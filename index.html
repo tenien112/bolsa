@@ -170,6 +170,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
 .chips button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font:700 13px Archivo,sans-serif;cursor:pointer}
 .bLis{display:grid;gap:8px;margin-top:8px}
+#gRadSel{display:block;margin-top:4px;background:var(--panel2);color:#F6C453;border:1px solid #F6C453;border-radius:8px;padding:3px 6px;font:700 13px "JetBrains Mono",monospace;max-width:100%;cursor:pointer}
 .bIt{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-left:6px solid #7FD3FF;border-radius:14px;padding:12px;cursor:pointer}
 .bIt .n{flex:1;font:700 15px Archivo,sans-serif;line-height:1.25}.bIt small{display:block;color:var(--mut);font:400 12px "JetBrains Mono",monospace;margin-top:2px}
 .bIt button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:15px;cursor:pointer}
@@ -840,7 +841,7 @@ function calculaMACD(cierres, r = 12, l = 26, s = 9){
 }
 let grafSeq = 0;   // cada apertura del gráfico tiene su número: si llega tarde una carga vieja, se descarta
 function limpiaCaja(){ document.querySelectorAll("#gCaja .tv-lightweight-charts").forEach(e => e.remove()); }
-async function abreGraf(sim, tf, cambio, titulo, tfs){
+async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
   const miSeq = ++grafSeq;
   try{ marcaPosB(); $("gPosL").classList.remove("on"); }catch(e){}
   if (G && G.chart) G.chart.remove();
@@ -848,9 +849,11 @@ async function abreGraf(sim, tf, cambio, titulo, tfs){
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
-  $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : posiciones().some(p => p.sim === sim) ? "📌 Con tu posición dibujada" : "Sin hora de cambio en esta línea"}</small>`;
+  $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : posiciones().some(p => p.sim === sim) ? "📌 Con tu posición dibujada" : "Sin hora de cambio en esta línea"}</small>`
+    + (selRadar ? `<select id="gRadSel" title="Radar con el que se calcula la línea amarilla">${B_RADARES.map((r, i) => `<option value="${i}"${i === selRadar.i ? " selected" : ""}>Radar ${esc(r.n)}</option>`).join("")}</select>` : "");
+  if (selRadar) $("gRadSel").onchange = e => { store("bolsa_radar_buscar", +e.target.value); selRadar.cambia(+e.target.value, tf); };
   $("gTfs").innerHTML = Object.keys(TF_NOM).map(k => `<button data-tf="${k}" class="${k === tf ? "on" : ""}">${TF_NOM[k]}</button>`).join("");
-  $("gTfs").querySelectorAll("button").forEach(b => b.onclick = () => abreGraf(sim, b.dataset.tf, cambio, titulo, tfs));
+  $("gTfs").querySelectorAll("button").forEach(b => b.onclick = () => abreGraf(sim, b.dataset.tf, cambio, titulo, tfs, selRadar));
   $("gNota").textContent = "Cargando velas…";
   let L, datos;
   try { [L, datos] = await Promise.all([cargaLW(), leeVelas(sim)]); }
@@ -1617,7 +1620,15 @@ new MutationObserver(() => ordenaDOM($("todoRes"))).observe($("todoRes"), {child
 
 // ---------- BUSCAR VALOR: cualquier par, acción, índice, materia prima o cripto ----------
 // Lo busca el workflow buscar.yml (Yahoo), guarda sus velas en velas/<SIM>.json y el resultado en busqueda.json
-const B_TFS = ["M30", "H1", "H2", "H4"];   // temporalidades del radar para la línea amarilla y los signos
+// Radares que se pueden elegir para la línea amarilla y los signos de un valor buscado
+const B_RADARES = [
+  {n: "CAMBIO TENDENCIAS (M30-H1-H2)", tfs: ["M30", "H1", "H2"]},
+  {n: "M30-H1-H2-H4", tfs: ["M30", "H1", "H2", "H4"]},
+  {n: "M5-M30-H1-H2-H4", tfs: ["M5", "M30", "H1", "H2", "H4"]},
+  {n: "M5-M15-M30-H1-H2-H4", tfs: ["M5", "M15", "M30", "H1", "H2", "H4"]},
+  {n: "5 TEMPORALIDADES (M30-H1-H2-H4-H8)", tfs: ["M30", "H1", "H2", "H4", "H8"]},
+];
+const bRadarIdx = () => { const i = store("bolsa_radar_buscar"); return (i != null && B_RADARES[i]) ? +i : 1; };
 const B_CHIPS = ["ORO", "EUR/USD", "IBEX 35", "SANTANDER", "INDITEX", "APPLE", "NVIDIA", "S&P 500", "NASDAQ", "DAX", "BITCOIN", "PETRÓLEO"];
 let bSondeo = null, bReloj = null;
 const bParar = () => { clearInterval(bSondeo); clearInterval(bReloj); bSondeo = bReloj = null; };
@@ -1640,8 +1651,8 @@ function pintaBuscados(){
   });
 }
 // Hora del último cambio del radar (M30-H1-H2-H4 todas a favor o todas en contra), en hora de Madrid: "dd/mm hh:mm"
-function cambioBuscado(datos){
-  const R = datos.radar || {}, ls = B_TFS.map(tf => R[String(TF_MIN[tf])] || []);
+function cambioBuscado(datos, tfs){
+  const R = datos.radar || {}, ls = tfs.map(tf => R[String(TF_MIN[tf])] || []);
   if (ls.every(l => !l.length)) return "";
   const ts = [...new Set(ls.flat().map(x => x[0]))].sort((a, b) => a - b);
   const total = t => { const es = ls.map(l => { const r = estadoEn(l, t); return r ? r.e : 0; }); return es.every(e => e === es[0] && e) ? es[0] : 0; };
@@ -1651,13 +1662,15 @@ function cambioBuscado(datos){
   const p = {}; fMad.formatToParts(new Date(ult * 1000)).forEach(x => p[x.type] = x.value);
   return `${p.day}/${p.month} ${String(+p.hour % 24).padStart(2, "0")}:${p.minute}`;
 }
-async function abreBuscado(b, fresco){
+async function abreBuscado(b, fresco, idx, tf){
   if (!store("bolsa_llave")){ toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   if (fresco) delete velasCache[b.sim];
+  if (idx == null) idx = bRadarIdx();
+  const R = B_RADARES[idx];
   let cambio = "";
-  try{ cambio = cambioBuscado(await leeVelas(b.sim)); }catch(e){}
+  try{ cambio = cambioBuscado(await leeVelas(b.sim), R.tfs); }catch(e){}
   simTV = b.tv || b.sim; abreCapa();
-  abreGraf(b.sim, "60", cambio, b.nombre + " · H1", B_TFS);
+  abreGraf(b.sim, tf || "60", cambio, b.nombre + " · H1", R.tfs, {i: idx, cambia: (k, t) => abreBuscado(b, false, k, t)});
 }
 async function leeBusqueda_viejo(){
   const r = await fetch(`https://api.github.com/repos/${REPO}/contents/busqueda.json?t=${Date.now()}`, {
@@ -1861,7 +1874,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.06-2";
+const APP_VERSION = "2026.11.06-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
