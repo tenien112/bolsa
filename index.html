@@ -165,6 +165,14 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gNota{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.4}
 
 .g-pos{background:#C9A2FF}
+.g-buscar{background:#7FD3FF}
+.bRow{display:flex;gap:8px}.bRow input{flex:1;margin:0}.bRow .btn{width:auto;margin:0;padding:0 18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.chips button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font:700 13px Archivo,sans-serif;cursor:pointer}
+.bLis{display:grid;gap:8px;margin-top:8px}
+.bIt{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-left:6px solid #7FD3FF;border-radius:14px;padding:12px;cursor:pointer}
+.bIt .n{flex:1;font:700 15px Archivo,sans-serif;line-height:1.25}.bIt small{display:block;color:var(--mut);font:400 12px "JetBrains Mono",monospace;margin-top:2px}
+.bIt button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:15px;cursor:pointer}
 .e-pos{background:#C9A2FF;color:#0E1A14}
 #posF{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:12}
 #posF.on{display:flex}
@@ -218,6 +226,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
     <button class="grande g-radar" data-ir="pRadar"><span class="e">📡</span>RADAR</button>
     <button class="grande g-comunes" data-ir="pComMenu"><span class="e">🤝</span>COMUNES</button>
     <button class="grande g-pos" id="bPos"><span class="e">📌</span>MIS POSICIONES</button>
+    <button class="grande g-buscar" id="bBuscar"><span class="e">🔎</span>BUSCAR VALOR</button>
   </div>
   <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
 </section>
@@ -282,6 +291,18 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <div class="ordenBar"><button data-o="a">🔤 MERCADO (A-Z)</button><button data-o="t">🕒 ÚLTIMO CAMBIO</button></div>
   <div id="comRes" class="bloque"></div>
   <button class="btn" id="comRepetir" hidden>🔄 Volver a comprobar</button>
+</section>
+
+<!-- BUSCAR VALOR -->
+<section class="pant" id="pBuscar">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>🔎 BUSCAR VALOR</h2>
+  <p class="sub">Escribe un par, una acción, un índice, una materia prima o una cripto (p. ej. Santander, Apple, IBEX, EUR/USD, oro) y te sale su gráfico con la línea amarilla del último cambio.</p>
+  <div class="bRow"><input id="bQ" type="search" placeholder="¿Qué valor buscas?" autocomplete="off" enterkeyhint="search"><button class="btn" id="bIr">BUSCAR</button></div>
+  <div class="chips" id="bChips"></div>
+  <div class="estado" id="bEstado" style="display:none"><div class="spin"></div><span></span></div>
+  <div id="bAlt"></div>
+  <div id="bRec"></div>
 </section>
 
 <!-- MIS POSICIONES -->
@@ -1243,7 +1264,7 @@ const MERCADOS = [
   ...["AUDUSD","EURAUD","EURCAD","EURCHF","EURCNH","EURGBP","EURJPY","EURUSD","GBPAUD","GBPCAD","GBPCHF","GBPJPY","GBPUSD","USDCAD","USDCHF","USDCNH","USDJPY"]
     .map(x => [x, x.slice(0,3) + "/" + x.slice(3), (x.includes("CNH") ? "FX_IDC:" : "FX:") + x])
 ];
-const merDe = sim => MERCADOS.find(m => m[0] === sim) || [sim, sim, "FX:" + sim];
+const merDe = sim => MERCADOS.find(m => m[0] === sim) || (b => b ? [sim, b.nombre, b.tv || sim] : [sim, sim, "FX:" + sim])((store("bolsa_buscados") || []).find(x => x.sim === sim));
 const posiciones = () => store("bolsa_posiciones") || [];
 const guardaPos = l => { store("bolsa_posiciones", l); pintaVistos(); };
 const fmtP = (x, ref) => { if (x == null || isNaN(x)) return "—"; const r = Math.abs(ref || x); const d = r < 10 ? 5 : r < 300 ? 3 : 2; return (+x).toLocaleString("es-ES", {minimumFractionDigits: d, maximumFractionDigits: d}); };
@@ -1594,12 +1615,107 @@ $("todoRepetir").onclick = comunesTodo;
 new MutationObserver(() => ordenaDOM($("todoRes"))).observe($("todoRes"), {childList: true});
 
 
+// ---------- BUSCAR VALOR: cualquier par, acción, índice, materia prima o cripto ----------
+// Lo busca el workflow buscar.yml (Yahoo), guarda sus velas en velas/<SIM>.json y el resultado en busqueda.json
+const B_TFS = ["M30", "H1", "H2", "H4"];   // temporalidades del radar para la línea amarilla y los signos
+const B_CHIPS = ["ORO", "EUR/USD", "IBEX 35", "SANTANDER", "INDITEX", "APPLE", "NVIDIA", "S&P 500", "NASDAQ", "DAX", "BITCOIN", "PETRÓLEO"];
+let bSondeo = null, bReloj = null;
+const bParar = () => { clearInterval(bSondeo); clearInterval(bReloj); bSondeo = bReloj = null; };
+function bEstado(txt, tipo){
+  const e = $("bEstado"); if (!txt){ e.style.display = "none"; return; }
+  e.style.display = ""; e.className = "estado" + (tipo ? " " + tipo : "");
+  e.innerHTML = (tipo ? (tipo === "ok" ? "✅" : "⚠️") : '<div class="spin"></div>') + `<span>${esc(txt)}</span>`;
+}
+const buscados = () => store("bolsa_buscados") || [];
+function pintaBuscados(){
+  const l = buscados();
+  $("bRec").innerHTML = l.length ? `<p class="etq">Buscados últimamente · pulsa para ver el gráfico (🔄 para actualizar las velas)</p><div class="bLis">` + l.map((b, i) =>
+    `<div class="bIt" data-i="${i}"><div class="n">${esc(b.nombre)}<small>${esc(b.ticker)}${b.tipo ? " · " + esc(b.tipo) : ""}${b.bolsa ? " · " + esc(b.bolsa) : ""}</small></div><button data-a="r" title="Actualizar velas">🔄</button><button data-a="x" title="Quitar de la lista">✕</button></div>`).join("") + "</div>" : "";
+  $("bRec").querySelectorAll(".bIt").forEach(el => el.onclick = ev => {
+    const b = buscados()[+el.dataset.i]; if (!b) return;
+    const a = ev.target.dataset && ev.target.dataset.a;
+    if (a === "x"){ store("bolsa_buscados", buscados().filter(x => x.sim !== b.sim)); pintaBuscados(); return; }
+    if (a === "r"){ buscar("=" + b.ticker); return; }
+    abreBuscado(b);
+  });
+}
+// Hora del último cambio del radar (M30-H1-H2-H4 todas a favor o todas en contra), en hora de Madrid: "dd/mm hh:mm"
+function cambioBuscado(datos){
+  const R = datos.radar || {}, ls = B_TFS.map(tf => R[String(TF_MIN[tf])] || []);
+  if (ls.every(l => !l.length)) return "";
+  const ts = [...new Set(ls.flat().map(x => x[0]))].sort((a, b) => a - b);
+  const total = t => { const es = ls.map(l => { const r = estadoEn(l, t); return r ? r.e : 0; }); return es.every(e => e === es[0] && e) ? es[0] : 0; };
+  let ult = null, ant;
+  ts.forEach((t, k) => { const v = total(t); if (k && v !== ant) ult = t; ant = v; });
+  if (ult == null) ult = ts[ts.length - 1];
+  const p = {}; fMad.formatToParts(new Date(ult * 1000)).forEach(x => p[x.type] = x.value);
+  return `${p.day}/${p.month} ${String(+p.hour % 24).padStart(2, "0")}:${p.minute}`;
+}
+async function abreBuscado(b, fresco){
+  if (!store("bolsa_llave")){ toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
+  if (fresco) delete velasCache[b.sim];
+  let cambio = "";
+  try{ cambio = cambioBuscado(await leeVelas(b.sim)); }catch(e){}
+  simTV = b.tv || b.sim; abreCapa();
+  abreGraf(b.sim, "60", cambio, b.nombre + " · H1", B_TFS);
+}
+async function leeBusqueda(){
+  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/busqueda.json?t=${Date.now()}`, {
+    headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github.raw+json"}, cache:"no-store"});
+  if (!r.ok) return null;
+  return r.json();
+}
+function pintaAlternativas(r){
+  const alt = (r.alternativas || []).filter(a => a.ticker !== r.ticker);
+  $("bAlt").innerHTML = alt.length ? `<p class="etq">¿No era este? Otros con ese nombre:</p><div class="bLis">` + alt.map((a, i) =>
+    `<div class="bIt" data-i="${i}"><div class="n">${esc(a.nombre || a.ticker)}<small>${esc(a.ticker)}${a.tipo ? " · " + esc(a.tipo) : ""}${a.bolsa ? " · " + esc(a.bolsa) : ""}</small></div></div>`).join("") + "</div>" : "";
+  $("bAlt").querySelectorAll(".bIt").forEach(el => el.onclick = () => buscar("=" + alt[+el.dataset.i].ticker));
+}
+async function buscar(q){
+  q = (q || "").trim(); if (!q) { $("bQ").focus(); return; }
+  if (!store("bolsa_llave")){ toast("Para buscar pon tu llave de GitHub en ⚙️", 4000); return; }
+  bParar(); $("bAlt").innerHTML = "";
+  const id = String(Date.now());
+  bEstado("Buscando «" + q.replace(/^=/, "") + "»…");
+  try{
+    const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/buscar.yml/dispatches`, {
+      method:"POST", headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github+json", "Content-Type":"application/json"},
+      body: JSON.stringify({ref:"main", inputs:{q, id}})});
+    if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error("llave");
+    if (!r.ok) throw new Error("GitHub respondió " + r.status);
+  }catch(e){ bEstado(e.message === "llave" ? "GitHub no acepta la llave guardada. Ponla otra vez en ⚙️" : "No se pudo buscar: " + e.message, "mal"); return; }
+  const inicio = Date.now();
+  bReloj = setInterval(() => bEstado(`Buscando «${q.replace(/^=/, "")}» en GitHub… ${Math.round((Date.now() - inicio) / 1000)} s (suele tardar 1-2 min)`), 1000);
+  bSondeo = setInterval(async () => {
+    if (pantalla !== "pBuscar") return bParar();
+    let r = null; try{ r = await leeBusqueda(); }catch(e){}
+    if (r && r.id === id){
+      bParar();
+      pintaAlternativas(r);
+      if (!r.ok){ bEstado(r.error || "No he encontrado ese valor.", "mal"); return; }
+      bEstado("Encontrado: " + r.nombre + " (" + r.ticker + ")", "ok");
+      if (navigator.vibrate) navigator.vibrate(80);
+      const b = {sim: r.sim, ticker: r.ticker, nombre: r.nombre, tipo: r.tipo, bolsa: r.bolsa, tv: r.tv};
+      store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15));
+      pintaBuscados();
+      abreBuscado(b, true);
+    } else if (Date.now() - inicio > 6 * 60 * 1000){ bParar(); bEstado("No ha llegado respuesta en 6 minutos. Prueba otra vez.", "mal"); }
+  }, 5000);
+}
+$("bBuscar").onclick = () => { ir("pBuscar"); pintaBuscados(); };
+$("bIr").onclick = () => buscar($("bQ").value);
+$("bQ").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); $("bQ").blur(); buscar($("bQ").value); } });
+$("bChips").innerHTML = B_CHIPS.map(c => `<button>${c}</button>`).join("");
+$("bChips").querySelectorAll("button").forEach(b => b.onclick = () => { $("bQ").value = b.textContent; buscar(b.textContent); });
+
 // ---------- Viñetas de ayuda: al dejar el ratón un momento sobre un botón sale qué hace ----------
 const AYUDA = {
   "#bLlave": "Ajustes: guardar, cambiar o borrar la llave de GitHub. Con ella la app ejecuta los vigilantes al momento y enseña los gráficos.",
   '#pInicio [data-ir="pRobot"]': "Abre la lista de ROBOTS (BOT COMPRAVENTA y BOT COMMODITIES). Pulsas uno, se ejecuta en GitHub y ves qué tiene abierto en cada mercado: LARGO, CORTO o nada.",
   '#pInicio [data-ir="pRadar"]': "Abre la lista de RADARES de tendencia. Pulsas uno, se ejecuta y ves el signo (+ o -) de cada temporalidad en cada mercado y si está ALCISTA o BAJISTA.",
   '#pInicio [data-ir="pComMenu"]': "Abre el menú de COMUNES: los mercados en los que coinciden radares y robots (COMUNES RADAR Y BOT, COMUNES M5-H4 y SUPERCOMÚN).",
+  "#bBuscar": "BUSCAR VALOR: escribe cualquier par, acción, índice, materia prima o cripto y te abre su gráfico en la app, con la línea amarilla del último cambio, el MACD y el radar al tocar una vela.",
+  "#bIr": "Busca el valor en GitHub (tarda 1-2 minutos) y abre su gráfico.",
   "#bPos": "MIS POSICIONES: las posiciones que apuntes a mano. Ves lo que va ganando o perdiendo cada una y salen dibujadas en el gráfico de la app.",
   "#install": "Instala BOLSA-LORENCITO como una aplicación más, con su icono.",
   ".volver": "Vuelve a la pantalla anterior.",
@@ -1679,7 +1795,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.04-18";
+const APP_VERSION = "2026.11.06-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
