@@ -297,7 +297,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 <section class="pant" id="pBuscar">
   <button class="volver" data-ir="pInicio">← Volver</button>
   <h2>🔎 BUSCAR VALOR</h2>
-  <p class="sub">Escribe un par, una acción, un índice, una materia prima o una cripto (p. ej. Santander, Apple, IBEX, EUR/USD, oro) y te sale su gráfico con la línea amarilla del último cambio.</p>
+  <p class="sub">Escribe un par, una acción, un índice, una materia prima o una cripto (p. ej. DIA, Santander, Apple, IBEX, EUR/USD, oro). Te salen los que coinciden, eliges el tuyo y se abre su gráfico con la línea amarilla del último cambio.</p>
   <div class="bRow"><input id="bQ" type="search" placeholder="¿Qué valor buscas?" autocomplete="off" enterkeyhint="search"><button class="btn" id="bIr">BUSCAR</button></div>
   <div class="chips" id="bChips"></div>
   <div class="estado" id="bEstado" style="display:none"><div class="spin"></div><span></span></div>
@@ -1635,7 +1635,7 @@ function pintaBuscados(){
     const b = buscados()[+el.dataset.i]; if (!b) return;
     const a = ev.target.dataset && ev.target.dataset.a;
     if (a === "x"){ store("bolsa_buscados", buscados().filter(x => x.sim !== b.sim)); pintaBuscados(); return; }
-    if (a === "r"){ buscar("=" + b.ticker); return; }
+    if (a === "r"){ bNombres[b.ticker] = b; descargar(b.ticker, b.nombre); return; }
     abreBuscado(b);
   });
 }
@@ -1659,49 +1659,115 @@ async function abreBuscado(b, fresco){
   simTV = b.tv || b.sim; abreCapa();
   abreGraf(b.sim, "60", cambio, b.nombre + " · H1", B_TFS);
 }
-async function leeBusqueda(){
+async function leeBusqueda_viejo(){
   const r = await fetch(`https://api.github.com/repos/${REPO}/contents/busqueda.json?t=${Date.now()}`, {
     headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github.raw+json"}, cache:"no-store"});
   if (!r.ok) return null;
   return r.json();
 }
-function pintaAlternativas(r){
-  const alt = (r.alternativas || []).filter(a => a.ticker !== r.ticker);
-  $("bAlt").innerHTML = alt.length ? `<p class="etq">¿No era este? Otros con ese nombre:</p><div class="bLis">` + alt.map((a, i) =>
-    `<div class="bIt" data-i="${i}"><div class="n">${esc(a.nombre || a.ticker)}<small>${esc(a.ticker)}${a.tipo ? " · " + esc(a.tipo) : ""}${a.bolsa ? " · " + esc(a.bolsa) : ""}</small></div></div>`).join("") + "</div>" : "";
-  $("bAlt").querySelectorAll(".bIt").forEach(el => el.onclick = () => buscar("=" + alt[+el.dataset.i].ticker));
+// --- Catálogo propio (catalogo.json, al lado de la app): opciones al instante mientras escribes ---
+let catalogo = [];
+fetch("catalogo.json", {cache: "no-cache"}).then(r => r.json()).then(c => { catalogo = c; }).catch(() => {});
+const bNorm = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[-/]/g, " ").replace(/\s+/g, " ").trim();
+const B_DIV = "EUR USD GBP JPY CHF CAD AUD NZD CNH CNY MXN SEK NOK DKK PLN TRY ZAR HKD SGD".split(" ");
+function bLocal(q){
+  const u = bNorm(q); if (!u) return [];
+  const ex = [], em = [], co = [], sal = [];
+  const fx = u.replace(/ /g, "").match(/^([A-Z]{3})([A-Z]{3})$/);
+  if (fx && B_DIV.includes(fx[1]) && B_DIV.includes(fx[2])) sal.push({ticker: (fx[1] + fx[2] === "USDCNH" ? "CNH" : fx[1] + fx[2]) + "=X", nombre: fx[1] + "/" + fx[2], tipo: "Divisa", bolsa: ""});
+  catalogo.forEach(([nombre, ticker, tipo, bolsa, ps]) => {
+    const x = {ticker, nombre, tipo, bolsa};
+    if (ps.some(p => p === u)) ex.push(x);
+    else if (ps.some(p => p.startsWith(u))) em.push(x);
+    else if (ps.some(p => (" " + p).includes(" " + u))) co.push(x);
+  });
+  return [...sal, ...ex, ...em, ...co];
 }
+let bOpciones = [], bNombres = {};
+function pintaOpciones(lista, titulo, esperando){
+  const vistos = new Set(); bOpciones = lista.filter(a => !vistos.has(a.ticker) && vistos.add(a.ticker));
+  $("bAlt").innerHTML = bOpciones.length || esperando ? `<p class="etq">${esc(titulo)}</p><div class="bLis">` + bOpciones.map((a, i) =>
+    `<div class="bIt" data-i="${i}"><div class="n">${esc(a.nombre || a.ticker)}<small>${esc(a.ticker)}${a.tipo ? " · " + esc(a.tipo) : ""}${a.bolsa ? " · " + esc(a.bolsa) : ""}</small></div><span style="font-size:20px">›</span></div>`).join("")
+    + (esperando ? `<div class="estado"><div class="spin"></div><span>Buscando más en Yahoo…</span></div>` : "") + "</div>" : "";
+  $("bAlt").querySelectorAll(".bIt").forEach(el => el.onclick = () => { const a = bOpciones[+el.dataset.i]; elige(a); });
+}
+function elige(a){
+  bNombres[a.ticker] = {nombre: a.nombre, tipo: a.tipo, bolsa: a.bolsa};
+  // Si ya lo buscaste hace menos de 15 min, se abre al momento sin volver a descargar
+  const ya = buscados().find(x => x.ticker === a.ticker);
+  if (ya && ya.hora && Date.now() - ya.hora < 15 * 60 * 1000){ abreBuscado(ya); return; }
+  descargar(a.ticker, a.nombre);
+}
+async function dispara(wf, inputs){
+  const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${wf}/dispatches`, {
+    method:"POST", headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github+json", "Content-Type":"application/json"},
+    body: JSON.stringify({ref:"main", inputs})});
+  if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error("llave");
+  if (!r.ok) throw new Error("GitHub respondió " + r.status);
+}
+const errLlave = e => e.message === "llave" ? "GitHub no acepta la llave guardada. Ponla otra vez en ⚙️" : "No se pudo buscar: " + e.message;
+async function leeRaw(f){
+  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${f}?t=${Date.now()}`, {
+    headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github.raw+json"}, cache:"no-store"});
+  return r.ok ? r.json() : null;
+}
+// Paso 1: lista de valores que cumplen lo escrito (al instante el catálogo; en ~10 s lo que añade Yahoo). Eliges tú.
 async function buscar(q){
   q = (q || "").trim(); if (!q) { $("bQ").focus(); return; }
+  if (q.startsWith("=")) return descargar(q.slice(1).trim());
   if (!store("bolsa_llave")){ toast("Para buscar pon tu llave de GitHub en ⚙️", 4000); return; }
-  bParar(); $("bAlt").innerHTML = "";
+  bParar(); bEstado("");
+  const loc = bLocal(q);
+  pintaOpciones(loc, "Elige cuál quieres:", true);
   const id = String(Date.now());
-  bEstado("Buscando «" + q.replace(/^=/, "") + "»…");
-  try{
-    const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/buscar.yml/dispatches`, {
-      method:"POST", headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github+json", "Content-Type":"application/json"},
-      body: JSON.stringify({ref:"main", inputs:{q, id}})});
-    if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error("llave");
-    if (!r.ok) throw new Error("GitHub respondió " + r.status);
-  }catch(e){ bEstado(e.message === "llave" ? "GitHub no acepta la llave guardada. Ponla otra vez en ⚙️" : "No se pudo buscar: " + e.message, "mal"); return; }
+  try{ await dispara("buscar-lista.yml", {q, id}); }
+  catch(e){ pintaOpciones(loc, "Elige cuál quieres:", false); if (!loc.length) bEstado(errLlave(e), "mal"); return; }
   const inicio = Date.now();
-  bReloj = setInterval(() => bEstado(`Buscando «${q.replace(/^=/, "")}» en GitHub… ${Math.round((Date.now() - inicio) / 1000)} s (suele tardar 1-2 min)`), 1000);
   bSondeo = setInterval(async () => {
     if (pantalla !== "pBuscar") return bParar();
-    let r = null; try{ r = await leeBusqueda(); }catch(e){}
+    let r = null; try{ r = await leeRaw("lista.json"); }catch(e){}
     if (r && r.id === id){
       bParar();
-      pintaAlternativas(r);
-      if (!r.ok){ bEstado(r.error || "No he encontrado ese valor.", "mal"); return; }
-      bEstado("Encontrado: " + r.nombre + " (" + r.ticker + ")", "ok");
+      const todo = [...loc, ...(r.lista || [])];
+      if (!todo.length){ pintaOpciones([], "", false); bEstado("No he encontrado nada con «" + q + "». Prueba con otro nombre o el ticker.", "mal"); return; }
+      pintaOpciones(todo, todo.length > 1 ? "Elige cuál quieres (" + new Set(todo.map(x => x.ticker)).size + "):" : "Encontrado:", false);
+      if (new Set(todo.map(x => x.ticker)).size === 1) elige(todo[0]);
+    } else if (Date.now() - inicio > 90 * 1000){ bParar(); pintaOpciones(loc, loc.length ? "Elige cuál quieres:" : "", false); if (!loc.length) bEstado("Yahoo no ha contestado. Prueba otra vez.", "mal"); }
+  }, 2500);
+}
+// Paso 2: descargar las velas SOLO del valor elegido y abrir su gráfico
+async function descargar(ticker, nombre){
+  if (!store("bolsa_llave")){ toast("Para buscar pon tu llave de GitHub en ⚙️", 4000); return; }
+  bParar();
+  const id = String(Date.now()), quien = nombre || ticker;
+  bEstado("Descargando velas de " + quien + "…");
+  try{ await dispara("buscar.yml", {q: "=" + ticker, id}); }catch(e){ bEstado(errLlave(e), "mal"); return; }
+  const inicio = Date.now();
+  bReloj = setInterval(() => bEstado(`Descargando velas de ${quien}… ${Math.round((Date.now() - inicio) / 1000)} s (unos 40 s)`), 1000);
+  bSondeo = setInterval(async () => {
+    if (pantalla !== "pBuscar") return bParar();
+    let r = null; try{ r = await leeRaw("busqueda.json"); }catch(e){}
+    if (r && r.id === id){
+      bParar();
+      if (!r.ok){ bEstado("Yahoo no tiene velas de " + quien + ". Elige otro de la lista.", "mal"); return; }
+      const extra = bNombres[r.ticker] || {};
+      const b = {sim: r.sim, ticker: r.ticker, nombre: (r.nombre && r.nombre !== r.ticker) ? r.nombre : (extra.nombre || r.ticker),
+                 tipo: r.tipo || extra.tipo, bolsa: r.bolsa || extra.bolsa, tv: r.tv, hora: Date.now()};
+      bEstado("Abriendo " + b.nombre + " (" + b.ticker + ")", "ok");
       if (navigator.vibrate) navigator.vibrate(80);
-      const b = {sim: r.sim, ticker: r.ticker, nombre: r.nombre, tipo: r.tipo, bolsa: r.bolsa, tv: r.tv};
       store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15));
       pintaBuscados();
       abreBuscado(b, true);
-    } else if (Date.now() - inicio > 6 * 60 * 1000){ bParar(); bEstado("No ha llegado respuesta en 6 minutos. Prueba otra vez.", "mal"); }
-  }, 5000);
+    } else if (Date.now() - inicio > 5 * 60 * 1000){ bParar(); bEstado("No ha llegado respuesta en 5 minutos. Prueba otra vez.", "mal"); }
+  }, 3000);
 }
+// Mientras escribes: opciones del catálogo al instante
+$("bQ").addEventListener("input", () => {
+  const q = $("bQ").value.trim();
+  if (q.length < 2){ if (!bSondeo) $("bAlt").innerHTML = ""; return; }
+  if (bSondeo) return;
+  const loc = bLocal(q); pintaOpciones(loc, loc.length ? "Coinciden (pulsa uno, o BUSCAR para ver todos los de Yahoo):" : "", false);
+});
 $("bBuscar").onclick = () => { ir("pBuscar"); pintaBuscados(); };
 $("bIr").onclick = () => buscar($("bQ").value);
 $("bQ").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); $("bQ").blur(); buscar($("bQ").value); } });
@@ -1714,7 +1780,7 @@ const AYUDA = {
   '#pInicio [data-ir="pRobot"]': "Abre la lista de ROBOTS (BOT COMPRAVENTA y BOT COMMODITIES). Pulsas uno, se ejecuta en GitHub y ves qué tiene abierto en cada mercado: LARGO, CORTO o nada.",
   '#pInicio [data-ir="pRadar"]': "Abre la lista de RADARES de tendencia. Pulsas uno, se ejecuta y ves el signo (+ o -) de cada temporalidad en cada mercado y si está ALCISTA o BAJISTA.",
   '#pInicio [data-ir="pComMenu"]': "Abre el menú de COMUNES: los mercados en los que coinciden radares y robots (COMUNES RADAR Y BOT, COMUNES M5-H4 y SUPERCOMÚN).",
-  "#bBuscar": "BUSCAR VALOR: escribe cualquier par, acción, índice, materia prima o cripto y te abre su gráfico en la app, con la línea amarilla del último cambio, el MACD y el radar al tocar una vela.",
+  "#bBuscar": "BUSCAR VALOR: escribe cualquier par, acción, índice, materia prima o cripto, eliges el tuyo entre los que coinciden y te abre su gráfico en la app, con la línea amarilla del último cambio, el MACD y el radar al tocar una vela.",
   "#bIr": "Busca el valor en GitHub (tarda 1-2 minutos) y abre su gráfico.",
   "#bPos": "MIS POSICIONES: las posiciones que apuntes a mano. Ves lo que va ganando o perdiendo cada una y salen dibujadas en el gráfico de la app.",
   "#install": "Instala BOLSA-LORENCITO como una aplicación más, con su icono.",
@@ -1795,7 +1861,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.06-1";
+const APP_VERSION = "2026.11.06-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
