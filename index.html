@@ -1645,7 +1645,19 @@ function bEstado(txt, tipo){
 const buscados = () => store("bolsa_buscados") || [];
 // FAVORITOS de BUSCAR VALOR: con la estrella ☆/⭐ de cada valor; salen arriba del todo, en su propio bloque
 const favoritos = () => store("bolsa_favoritos") || [];
-const esFav = sim => favoritos().some(x => x.sim === sim);
+const esFav = (sim, tk) => favoritos().some(x => (sim && x.sim === sim) || (tk && x.ticker === tk));
+// Subir un valor a favoritos (desde Buscados o desde la lista «Elige cuál quieres»)
+function hazFav(b){
+  store("bolsa_favoritos", [...favoritos().filter(x => x.ticker !== b.ticker), b]);
+  // si ya había un favorito fijo del mismo valor (p. ej. ORO), se quita para que no salga dos veces
+  store("bolsa_chips", chipsFijos().filter(c => { const x = bLocal(c)[0]; return !x || x.ticker !== b.ticker; }));
+  toast("⭐ " + (b.nombre || b.ticker) + " subido a favoritos", 1800);
+}
+function quitaFav(b){
+  store("bolsa_favoritos", favoritos().filter(x => x.ticker !== b.ticker && !(b.sim && x.sim === b.sim)));
+  if (b.sim) store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15));
+  toast((b.nombre || b.ticker) + " quitado de favoritos", 1800);
+}
 // Fila de FAVORITOS (arriba): los fijos de siempre (ORO, SANTANDER, NVIDIA…) que no hayas quitado + los que marques con ☆.
 // Pulsar el nombre lo abre; pulsar su ⭐ lo quita de favoritos y desaparece de la fila.
 const chipsFijos = () => store("bolsa_chips") || B_CHIPS;
@@ -1662,17 +1674,13 @@ function pintaChips(){
       $("bQ").value = c; buscar(c);
     } else {
       const b = fav[i]; if (!b) return;
-      if (quitar){
-        store("bolsa_favoritos", favoritos().filter(x => x.sim !== b.sim));
-        store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15));
-        toast(b.nombre + " quitado de favoritos", 1800); pintaBuscados(); return;
-      }
-      abreBuscado(b);
+      if (quitar){ quitaFav(b); pintaBuscados(); return; }
+      if (b.sim) abreBuscado(b); else elige(b);
     }
   });
 }
 function pintaBuscados(){
-  const fav = favoritos(), rec = buscados().filter(b => !esFav(b.sim));
+  const fav = favoritos(), rec = buscados().filter(b => !esFav(b.sim, b.ticker));
   const item = (b, i, f) => `<div class="bIt${f ? " fav" : ""}" data-i="${i}" data-f="${f ? 1 : ""}"><button data-a="s" class="estr" title="${f ? "Quitar de favoritos" : "Añadir a favoritos"}">${f ? "⭐" : "☆"}</button><div class="n">${esc(b.nombre)}<small>${esc(b.ticker)}${b.tipo ? " · " + esc(b.tipo) : ""}${b.bolsa ? " · " + esc(b.bolsa) : ""}</small></div><button data-a="r" title="Actualizar velas">🔄</button>${f ? "" : '<button data-a="x" title="Quitar de la lista">✕</button>'}</div>`;
   pintaChips();
   $("bRec").innerHTML =
@@ -1681,13 +1689,8 @@ function pintaBuscados(){
     const f = !!el.dataset.f, b = (f ? fav : rec)[+el.dataset.i]; if (!b) return;
     const a = ev.target.dataset && ev.target.dataset.a;
     if (a === "s"){
-      if (f){ store("bolsa_favoritos", favoritos().filter(x => x.sim !== b.sim)); store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15)); toast("Quitado de favoritos", 1800); }
-      else {
-        store("bolsa_favoritos", [...favoritos(), b]);
-        // si ya había un favorito fijo del mismo valor (p. ej. ORO), se quita para que no salga dos veces
-        store("bolsa_chips", chipsFijos().filter(c => { const x = bLocal(c)[0]; return !x || x.ticker !== b.ticker; }));
-        toast("⭐ " + b.nombre + " subido a favoritos", 1800);
-      }
+      if (f) quitaFav(b);
+      else hazFav(b);
       pintaBuscados(); return;
     }
     if (a === "x"){ store("bolsa_buscados", buscados().filter(x => x.sim !== b.sim)); pintaBuscados(); return; }
@@ -1746,9 +1749,18 @@ let bOpciones = [], bNombres = {};
 function pintaOpciones(lista, titulo, esperando){
   const vistos = new Set(); bOpciones = lista.filter(a => !vistos.has(a.ticker) && vistos.add(a.ticker));
   $("bAlt").innerHTML = bOpciones.length || esperando ? `<p class="etq">${esc(titulo)}</p><div class="bLis">` + bOpciones.map((a, i) =>
-    `<div class="bIt" data-i="${i}"><div class="n">${esc(a.nombre || a.ticker)}<small>${esc(a.ticker)}${a.tipo ? " · " + esc(a.tipo) : ""}${a.bolsa ? " · " + esc(a.bolsa) : ""}</small></div><span style="font-size:20px">›</span></div>`).join("")
+    `<div class="bIt" data-i="${i}"><button data-a="s" class="estr" title="${esFav(null, a.ticker) ? "Quitar de favoritos" : "Subir a favoritos"}">${esFav(null, a.ticker) ? "⭐" : "☆"}</button><div class="n">${esc(a.nombre || a.ticker)}<small>${esc(a.ticker)}${a.tipo ? " · " + esc(a.tipo) : ""}${a.bolsa ? " · " + esc(a.bolsa) : ""}</small></div><span style="font-size:20px">›</span></div>`).join("")
     + (esperando ? `<div class="estado"><div class="spin"></div><span>Buscando más en Yahoo…</span></div>` : "") + "</div>" : "";
-  $("bAlt").querySelectorAll(".bIt").forEach(el => el.onclick = () => { const a = bOpciones[+el.dataset.i]; elige(a); });
+  $("bAlt").querySelectorAll(".bIt").forEach(el => el.onclick = ev => {
+    const a = bOpciones[+el.dataset.i]; if (!a) return;
+    if (ev.target.dataset && ev.target.dataset.a === "s"){
+      if (esFav(null, a.ticker)) quitaFav(favoritos().find(x => x.ticker === a.ticker) || a);
+      else hazFav(buscados().find(x => x.ticker === a.ticker) || {ticker: a.ticker, nombre: a.nombre || a.ticker, tipo: a.tipo, bolsa: a.bolsa});
+      const b = ev.target, f = esFav(null, a.ticker); b.textContent = f ? "⭐" : "☆"; b.title = f ? "Quitar de favoritos" : "Subir a favoritos";
+      pintaBuscados(); return;
+    }
+    elige(a);
+  });
 }
 function elige(a){
   bNombres[a.ticker] = {nombre: a.nombre, tipo: a.tipo, bolsa: a.bolsa};
@@ -1822,7 +1834,7 @@ async function descargar(ticker, nombre){
       bEstado("Abriendo " + b.nombre + " (" + b.ticker + ")", "ok");
       if (navigator.vibrate) navigator.vibrate(80);
       store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15));
-      if (esFav(b.sim)) store("bolsa_favoritos", favoritos().map(x => x.sim === b.sim ? b : x));
+      if (esFav(b.sim, b.ticker)) store("bolsa_favoritos", favoritos().map(x => (x.sim === b.sim || x.ticker === b.ticker) ? b : x));
       pintaBuscados();
       abreBuscado(b, true);
     } else if (Date.now() - inicio > 5 * 60 * 1000){ bParar(); bEstado("No ha llegado respuesta en 5 minutos. Prueba otra vez.", "mal"); }
@@ -1927,7 +1939,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.07-5";
+const APP_VERSION = "2026.11.07-6";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
