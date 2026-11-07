@@ -174,6 +174,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .bIt{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-left:6px solid #7FD3FF;border-radius:14px;padding:12px;cursor:pointer}
 .bIt .n{flex:1;font:700 15px Archivo,sans-serif;line-height:1.25}.bIt small{display:block;color:var(--mut);font:400 12px "JetBrains Mono",monospace;margin-top:2px}
 .bIt button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:15px;cursor:pointer}
+.bIt button.estr{background:none;border:none;padding:4px 2px;font-size:24px;color:var(--oro);line-height:1}.bIt.fav{border-left-color:var(--oro)}
 .e-pos{background:#C9A2FF;color:#0E1A14}
 #posF{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:12}
 #posF.on{display:flex}
@@ -1267,7 +1268,7 @@ const MERCADOS = [
   ...["AUDUSD","EURAUD","EURCAD","EURCHF","EURCNH","EURGBP","EURJPY","EURUSD","GBPAUD","GBPCAD","GBPCHF","GBPJPY","GBPUSD","USDCAD","USDCHF","USDCNH","USDJPY"]
     .map(x => [x, x.slice(0,3) + "/" + x.slice(3), (x.includes("CNH") ? "FX_IDC:" : "FX:") + x])
 ];
-const merDe = sim => MERCADOS.find(m => m[0] === sim) || (b => b ? [sim, b.nombre, b.tv || sim] : [sim, sim, "FX:" + sim])((store("bolsa_buscados") || []).find(x => x.sim === sim));
+const merDe = sim => MERCADOS.find(m => m[0] === sim) || (b => b ? [sim, b.nombre, b.tv || sim] : [sim, sim, "FX:" + sim])([...(store("bolsa_favoritos") || []), ...(store("bolsa_buscados") || [])].find(x => x.sim === sim));
 const posiciones = () => store("bolsa_posiciones") || [];
 const guardaPos = l => { store("bolsa_posiciones", l); pintaVistos(); };
 const fmtP = (x, ref) => { if (x == null || isNaN(x)) return "—"; const r = Math.abs(ref || x); const d = r < 10 ? 5 : r < 300 ? 3 : 2; return (+x).toLocaleString("es-ES", {minimumFractionDigits: d, maximumFractionDigits: d}); };
@@ -1640,13 +1641,23 @@ function bEstado(txt, tipo){
   e.innerHTML = (tipo ? (tipo === "ok" ? "✅" : "⚠️") : '<div class="spin"></div>') + `<span>${esc(txt)}</span>`;
 }
 const buscados = () => store("bolsa_buscados") || [];
+// FAVORITOS de BUSCAR VALOR: con la estrella ☆/⭐ de cada valor; salen arriba del todo, en su propio bloque
+const favoritos = () => store("bolsa_favoritos") || [];
+const esFav = sim => favoritos().some(x => x.sim === sim);
 function pintaBuscados(){
-  const l = buscados();
-  $("bRec").innerHTML = l.length ? `<p class="etq">Buscados últimamente · pulsa para ver el gráfico (🔄 para actualizar las velas)</p><div class="bLis">` + l.map((b, i) =>
-    `<div class="bIt" data-i="${i}"><div class="n">${esc(b.nombre)}<small>${esc(b.ticker)}${b.tipo ? " · " + esc(b.tipo) : ""}${b.bolsa ? " · " + esc(b.bolsa) : ""}</small></div><button data-a="r" title="Actualizar velas">🔄</button><button data-a="x" title="Quitar de la lista">✕</button></div>`).join("") + "</div>" : "";
+  const fav = favoritos(), rec = buscados().filter(b => !esFav(b.sim));
+  const item = (b, i, f) => `<div class="bIt${f ? " fav" : ""}" data-i="${i}" data-f="${f ? 1 : ""}"><button data-a="s" class="estr" title="${f ? "Quitar de favoritos" : "Añadir a favoritos"}">${f ? "⭐" : "☆"}</button><div class="n">${esc(b.nombre)}<small>${esc(b.ticker)}${b.tipo ? " · " + esc(b.tipo) : ""}${b.bolsa ? " · " + esc(b.bolsa) : ""}</small></div><button data-a="r" title="Actualizar velas">🔄</button>${f ? "" : '<button data-a="x" title="Quitar de la lista">✕</button>'}</div>`;
+  $("bRec").innerHTML =
+    (fav.length ? `<p class="etq">⭐ Favoritos · pulsa la estrella para quitarlo</p><div class="bLis">` + fav.map((b, i) => item(b, i, true)).join("") + "</div>" : "")
+    + (rec.length ? `<p class="etq">Buscados últimamente · ☆ para hacerlo favorito (🔄 para actualizar las velas)</p><div class="bLis">` + rec.map((b, i) => item(b, i, false)).join("") + "</div>" : "");
   $("bRec").querySelectorAll(".bIt").forEach(el => el.onclick = ev => {
-    const b = buscados()[+el.dataset.i]; if (!b) return;
+    const f = !!el.dataset.f, b = (f ? fav : rec)[+el.dataset.i]; if (!b) return;
     const a = ev.target.dataset && ev.target.dataset.a;
+    if (a === "s"){
+      if (f){ store("bolsa_favoritos", favoritos().filter(x => x.sim !== b.sim)); store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15)); toast("Quitado de favoritos", 1800); }
+      else { store("bolsa_favoritos", [...favoritos(), b]); toast("⭐ " + b.nombre + " en favoritos", 1800); }
+      pintaBuscados(); return;
+    }
     if (a === "x"){ store("bolsa_buscados", buscados().filter(x => x.sim !== b.sim)); pintaBuscados(); return; }
     if (a === "r"){ bNombres[b.ticker] = b; descargar(b.ticker, b.nombre); return; }
     abreBuscado(b);
@@ -1779,6 +1790,7 @@ async function descargar(ticker, nombre){
       bEstado("Abriendo " + b.nombre + " (" + b.ticker + ")", "ok");
       if (navigator.vibrate) navigator.vibrate(80);
       store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15));
+      if (esFav(b.sim)) store("bolsa_favoritos", favoritos().map(x => x.sim === b.sim ? b : x));
       pintaBuscados();
       abreBuscado(b, true);
     } else if (Date.now() - inicio > 5 * 60 * 1000){ bParar(); bEstado("No ha llegado respuesta en 5 minutos. Prueba otra vez.", "mal"); }
@@ -1884,7 +1896,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.07-3";
+const APP_VERSION = "2026.11.07-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
