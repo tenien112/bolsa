@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>BOLSA-LORENCITO</title>
+<title>BOLSA-LORENZITO</title>
 <meta name="author" content="Lorenzo Moreno Villalba">
 <meta name="copyright" content="© Lorenzo Moreno Villalba">
 <link rel="manifest" href="manifest.json">
@@ -216,7 +216,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 </head>
 <body>
 <header>
-  <h1>BOLSA-<span>LORENCITO</span></h1>
+  <h1>BOLSA-<span>LORENZITO</span></h1>
   <button class="ico" id="bLlave" title="Llave de GitHub" aria-label="Ajustes">⚙️</button>
 </header>
 
@@ -323,7 +323,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <h2>⚙️ Llave de GitHub</h2>
   <div class="caja">
     Para que la app <b>ejecute</b> los vigilantes al momento necesita una llave de GitHub (solo una vez; se queda guardada en este móvil).<br><br>
-    1. Abre <a href="https://github.com/settings/tokens/new?scopes=repo&description=BOLSA-LORENCITO" target="_blank" rel="noopener">este enlace</a> (ya va rellenado).<br>
+    1. Abre <a href="https://github.com/settings/tokens/new?scopes=repo&description=BOLSA-LORENZITO" target="_blank" rel="noopener">este enlace</a> (ya va rellenado).<br>
     2. En «Expiration» elige <b>No expiration</b>.<br>
     3. Pulsa <b>Generate token</b>, cópialo y pégalo aquí.
   </div>
@@ -333,7 +333,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <p class="sub" id="llaveEstado"></p>
 </section>
 
-<footer>BOLSA-LORENCITO · by Lorenzo<br>© <span id="year">2026</span> Lorenzo Moreno Villalba. Todos los derechos reservados.</footer>
+<footer>BOLSA-LORENZITO · by Lorenzo<br>© <span id="year">2026</span> Lorenzo Moreno Villalba. Todos los derechos reservados.</footer>
 <div id="hoja">
   <div class="caj">
     <h3 id="hojaTit"></h3>
@@ -1805,7 +1805,7 @@ const AYUDA = {
   "#bBuscar": "BUSCAR VALOR: escribe cualquier par, acción, índice, materia prima o cripto, eliges el tuyo entre los que coinciden y te abre su gráfico en la app, con la línea amarilla del último cambio, el MACD y el radar al tocar una vela.",
   "#bIr": "Busca el valor en GitHub (tarda 1-2 minutos) y abre su gráfico.",
   "#bPos": "MIS POSICIONES: las posiciones que apuntes a mano. Ves lo que va ganando o perdiendo cada una y salen dibujadas en el gráfico de la app.",
-  "#install": "Instala BOLSA-LORENCITO como una aplicación más, con su icono.",
+  "#install": "Instala BOLSA-LORENZITO como una aplicación más, con su icono.",
   ".volver": "Vuelve a la pantalla anterior.",
   "#bComunes": "Ejecuta el RADAR CAMBIO TENDENCIAS y el BOT COMPRAVENTA y te enseña dónde coinciden: mercados BAJISTAS en el radar con el bot en CORTO, y ALCISTAS con el bot en LARGO.",
   "#bComunes2": "Igual que COMUNES RADAR Y BOT, pero con el RADAR M5-M30-H1-H2-H4 (el del aviso automático al móvil) en lugar del RADAR CAMBIO TENDENCIAS.",
@@ -1875,7 +1875,7 @@ document.addEventListener("mouseout", e => { if (ayudaEl && !ayudaEl.contains(e.
 // ---------- Instalar ----------
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").style.display = "block"; });
-window.addEventListener("appinstalled", () => { $("install").style.display = "none"; installEvt = null; toast("BOLSA-LORENCITO instalada"); });
+window.addEventListener("appinstalled", () => { $("install").style.display = "none"; installEvt = null; toast("BOLSA-LORENZITO instalada"); });
 $("install").onclick = async () => {
   if (installEvt){ installEvt.prompt(); try{ await installEvt.userChoice; }catch(e){} installEvt = null; $("install").style.display = "none"; }
 };
@@ -1883,11 +1883,11 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.07-1";
+const APP_VERSION = "2026.11.07-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
-  if (prev !== null && prev !== APP_VERSION) toast("BOLSA-LORENCITO se ha actualizado", 4000);
+  if (prev !== null && prev !== APP_VERSION) toast("BOLSA-LORENZITO se ha actualizado", 4000);
 })();
 if ("serviceWorker" in navigator){
   navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{});

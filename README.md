@@ -1,4 +1,4 @@
-# BOLSA-LORENCITO
+# BOLSA-LORENZITO
 
 App web para lanzar los radares y robots de forex-alertas y ver su respuesta en pantalla.
 
