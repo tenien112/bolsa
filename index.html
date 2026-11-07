@@ -1652,14 +1652,15 @@ function pintaBuscados(){
     abreBuscado(b);
   });
 }
-// Hora del último cambio del radar (M30-H1-H2-H4 todas a favor o todas en contra), en hora de Madrid: "dd/mm hh:mm"
+// Hora del último cambio del radar, igual que en los radares de verdad: el último momento en que cambió el signo
+// de CUALQUIERA de sus temporalidades (no solo cuando se alinean todas), en hora de Madrid: "dd/mm hh:mm"
 function cambioBuscado(datos, tfs){
   const R = datos.radar || {}, ls = tfs.map(tf => R[String(TF_MIN[tf])] || []);
   if (ls.every(l => !l.length)) return "";
   const ts = [...new Set(ls.flat().map(x => x[0]))].sort((a, b) => a - b);
-  const total = t => { const es = ls.map(l => { const r = estadoEn(l, t); return r ? r.e : 0; }); return es.every(e => e === es[0] && e) ? es[0] : 0; };
+  const combo = t => ls.map(l => { const r = estadoEn(l, t); return r ? r.e : "?"; }).join(",");
   let ult = null, ant;
-  ts.forEach((t, k) => { const v = total(t); if (k && v !== ant) ult = t; ant = v; });
+  ts.forEach((t, k) => { const v = combo(t); if (k && v !== ant) ult = t; ant = v; });
   if (ult == null) ult = ts[ts.length - 1];
   const p = {}; fMad.formatToParts(new Date(ult * 1000)).forEach(x => p[x.type] = x.value);
   return `${p.day}/${p.month} ${String(+p.hour % 24).padStart(2, "0")}:${p.minute}`;
@@ -1883,7 +1884,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.07-2";
+const APP_VERSION = "2026.11.07-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
