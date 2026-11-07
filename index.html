@@ -169,6 +169,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .bRow{display:flex;gap:8px}.bRow input{flex:1;margin:0}.bRow .btn{width:auto;margin:0;padding:0 18px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
 .chips button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font:700 13px Archivo,sans-serif;cursor:pointer}
+.chips button .cs{display:inline-block;padding:0 8px 0 2px;margin-right:4px;border-right:1px solid var(--line)}
 .bLis{display:grid;gap:8px;margin-top:8px}
 #gRadSel{display:block;margin-top:4px;background:var(--panel2);color:#F6C453;border:1px solid #F6C453;border-radius:8px;padding:3px 6px;font:700 13px "JetBrains Mono",monospace;max-width:100%;cursor:pointer}
 .bIt{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-left:6px solid #7FD3FF;border-radius:14px;padding:12px;cursor:pointer}
@@ -301,6 +302,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <h2>🔎 BUSCAR VALOR</h2>
   <p class="sub">Escribe un par, una acción, un índice, una materia prima o una cripto (p. ej. DIA, Santander, Apple, IBEX, EUR/USD, oro). Te salen los que coinciden, eliges el tuyo y se abre su gráfico con la línea amarilla del último cambio.</p>
   <div class="bRow"><input id="bQ" type="search" placeholder="¿Qué valor buscas?" autocomplete="off" enterkeyhint="search"><button class="btn" id="bIr">BUSCAR</button></div>
+  <p class="etq" id="bChipsEtq">⭐ Favoritos · pulsa el nombre para verlo, la ⭐ para quitarlo</p>
   <div class="chips" id="bChips"></div>
   <div class="estado" id="bEstado" style="display:none"><div class="spin"></div><span></span></div>
   <div id="bAlt"></div>
@@ -1644,18 +1646,48 @@ const buscados = () => store("bolsa_buscados") || [];
 // FAVORITOS de BUSCAR VALOR: con la estrella ☆/⭐ de cada valor; salen arriba del todo, en su propio bloque
 const favoritos = () => store("bolsa_favoritos") || [];
 const esFav = sim => favoritos().some(x => x.sim === sim);
+// Fila de FAVORITOS (arriba): los fijos de siempre (ORO, SANTANDER, NVIDIA…) que no hayas quitado + los que marques con ☆.
+// Pulsar el nombre lo abre; pulsar su ⭐ lo quita de favoritos y desaparece de la fila.
+const chipsFijos = () => store("bolsa_chips") || B_CHIPS;
+function pintaChips(){
+  const fij = chipsFijos(), fav = favoritos();
+  $("bChips").innerHTML = fij.map((c, i) => `<button data-k="c" data-i="${i}"><span class="cs" title="Quitar de favoritos">⭐</span>${esc(c)}</button>`).join("")
+    + fav.map((b, i) => `<button data-k="f" data-i="${i}"><span class="cs" title="Quitar de favoritos">⭐</span>${esc((b.nombre || b.ticker).toUpperCase())}</button>`).join("");
+  $("bChipsEtq").style.display = (fij.length || fav.length) ? "" : "none";
+  $("bChips").querySelectorAll("button").forEach(el => el.onclick = ev => {
+    const i = +el.dataset.i, quitar = ev.target.classList.contains("cs");
+    if (el.dataset.k === "c"){
+      const c = fij[i]; if (c == null) return;
+      if (quitar){ store("bolsa_chips", chipsFijos().filter(x => x !== c)); toast(c + " quitado de favoritos", 1800); pintaChips(); return; }
+      $("bQ").value = c; buscar(c);
+    } else {
+      const b = fav[i]; if (!b) return;
+      if (quitar){
+        store("bolsa_favoritos", favoritos().filter(x => x.sim !== b.sim));
+        store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15));
+        toast(b.nombre + " quitado de favoritos", 1800); pintaBuscados(); return;
+      }
+      abreBuscado(b);
+    }
+  });
+}
 function pintaBuscados(){
   const fav = favoritos(), rec = buscados().filter(b => !esFav(b.sim));
   const item = (b, i, f) => `<div class="bIt${f ? " fav" : ""}" data-i="${i}" data-f="${f ? 1 : ""}"><button data-a="s" class="estr" title="${f ? "Quitar de favoritos" : "Añadir a favoritos"}">${f ? "⭐" : "☆"}</button><div class="n">${esc(b.nombre)}<small>${esc(b.ticker)}${b.tipo ? " · " + esc(b.tipo) : ""}${b.bolsa ? " · " + esc(b.bolsa) : ""}</small></div><button data-a="r" title="Actualizar velas">🔄</button>${f ? "" : '<button data-a="x" title="Quitar de la lista">✕</button>'}</div>`;
+  pintaChips();
   $("bRec").innerHTML =
-    (fav.length ? `<p class="etq">⭐ Favoritos · pulsa la estrella para quitarlo</p><div class="bLis">` + fav.map((b, i) => item(b, i, true)).join("") + "</div>" : "")
-    + (rec.length ? `<p class="etq">Buscados últimamente · ☆ para hacerlo favorito (🔄 para actualizar las velas)</p><div class="bLis">` + rec.map((b, i) => item(b, i, false)).join("") + "</div>" : "");
+    (rec.length ? `<p class="etq">Buscados últimamente · ☆ para subirlo a favoritos (🔄 para actualizar las velas)</p><div class="bLis">` + rec.map((b, i) => item(b, i, false)).join("") + "</div>" : "");
   $("bRec").querySelectorAll(".bIt").forEach(el => el.onclick = ev => {
     const f = !!el.dataset.f, b = (f ? fav : rec)[+el.dataset.i]; if (!b) return;
     const a = ev.target.dataset && ev.target.dataset.a;
     if (a === "s"){
       if (f){ store("bolsa_favoritos", favoritos().filter(x => x.sim !== b.sim)); store("bolsa_buscados", [b, ...buscados().filter(x => x.sim !== b.sim)].slice(0, 15)); toast("Quitado de favoritos", 1800); }
-      else { store("bolsa_favoritos", [...favoritos(), b]); toast("⭐ " + b.nombre + " en favoritos", 1800); }
+      else {
+        store("bolsa_favoritos", [...favoritos(), b]);
+        // si ya había un favorito fijo del mismo valor (p. ej. ORO), se quita para que no salga dos veces
+        store("bolsa_chips", chipsFijos().filter(c => { const x = bLocal(c)[0]; return !x || x.ticker !== b.ticker; }));
+        toast("⭐ " + b.nombre + " subido a favoritos", 1800);
+      }
       pintaBuscados(); return;
     }
     if (a === "x"){ store("bolsa_buscados", buscados().filter(x => x.sim !== b.sim)); pintaBuscados(); return; }
@@ -1806,8 +1838,7 @@ $("bQ").addEventListener("input", () => {
 $("bBuscar").onclick = () => { ir("pBuscar"); pintaBuscados(); };
 $("bIr").onclick = () => buscar($("bQ").value);
 $("bQ").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); $("bQ").blur(); buscar($("bQ").value); } });
-$("bChips").innerHTML = B_CHIPS.map(c => `<button>${c}</button>`).join("");
-$("bChips").querySelectorAll("button").forEach(b => b.onclick = () => { $("bQ").value = b.textContent; buscar(b.textContent); });
+pintaChips();
 
 // ---------- Viñetas de ayuda: al dejar el ratón un momento sobre un botón sale qué hace ----------
 const AYUDA = {
@@ -1896,7 +1927,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.07-4";
+const APP_VERSION = "2026.11.07-5";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
