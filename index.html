@@ -1631,7 +1631,9 @@ const B_RADARES = [
 const bRadarIdx = () => { const i = store("bolsa_radar_buscar"); return (i != null && B_RADARES[i]) ? +i : 1; };
 const B_CHIPS = ["ORO", "EUR/USD", "IBEX 35", "SANTANDER", "INDITEX", "APPLE", "NVIDIA", "S&P 500", "NASDAQ", "DAX", "BITCOIN", "PETRÓLEO"];
 let bSondeo = null, bReloj = null;
-const bParar = () => { clearInterval(bSondeo); clearInterval(bReloj); bSondeo = bReloj = null; };
+// bGen: cada búsqueda/descarga nueva invalida las respuestas que lleguen tarde de la anterior
+let bGen = 0;
+const bParar = () => { bGen++; clearInterval(bSondeo); clearInterval(bReloj); bSondeo = bReloj = null; };
 function bEstado(txt, tipo){
   const e = $("bEstado"); if (!txt){ e.style.display = "none"; return; }
   e.style.display = ""; e.className = "estado" + (tipo ? " " + tipo : "");
@@ -1733,12 +1735,15 @@ async function buscar(q){
   const loc = bLocal(q);
   pintaOpciones(loc, "Elige cuál quieres:", true);
   const id = String(Date.now());
+  const genL = bGen;
   try{ await dispara("buscar-lista.yml", {q, id}); }
-  catch(e){ pintaOpciones(loc, "Elige cuál quieres:", false); if (!loc.length) bEstado(errLlave(e), "mal"); return; }
-  const inicio = Date.now();
+  catch(e){ if (genL !== bGen) return; pintaOpciones(loc, "Elige cuál quieres:", false); if (!loc.length) bEstado(errLlave(e), "mal"); return; }
+  const inicio = Date.now(), gen = bGen;
   bSondeo = setInterval(async () => {
+    if (gen !== bGen) return;
     if (pantalla !== "pBuscar") return bParar();
     let r = null; try{ r = await leeRaw("lista.json"); }catch(e){}
+    if (gen !== bGen) return;
     if (r && r.id === id){
       bParar();
       const todo = [...loc, ...(r.lista || [])];
@@ -1754,12 +1759,16 @@ async function descargar(ticker, nombre){
   bParar();
   const id = String(Date.now()), quien = nombre || ticker;
   bEstado("Descargando velas de " + quien + "…");
-  try{ await dispara("buscar.yml", {q: "=" + ticker, id}); }catch(e){ bEstado(errLlave(e), "mal"); return; }
-  const inicio = Date.now();
+  const genD = bGen;
+  try{ await dispara("buscar.yml", {q: "=" + ticker, id}); }catch(e){ if (genD === bGen) bEstado(errLlave(e), "mal"); return; }
+  if (genD !== bGen) return;
+  const inicio = Date.now(), gen = bGen;
   bReloj = setInterval(() => bEstado(`Descargando velas de ${quien}… ${Math.round((Date.now() - inicio) / 1000)} s (unos 40 s)`), 1000);
   bSondeo = setInterval(async () => {
+    if (gen !== bGen) return;
     if (pantalla !== "pBuscar") return bParar();
     let r = null; try{ r = await leeRaw("busqueda.json"); }catch(e){}
+    if (gen !== bGen) return;
     if (r && r.id === id){
       bParar();
       if (!r.ok){ bEstado("Yahoo no tiene velas de " + quien + ". Elige otro de la lista.", "mal"); return; }
@@ -1874,7 +1883,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.06-3";
+const APP_VERSION = "2026.11.07-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
@@ -1889,7 +1898,7 @@ async function buscarVersionNueva(){
   try{
     const t = await (await fetch("./?v="+Date.now(),{cache:"no-store"})).text();
     const m = t.match(/const APP_VERSION = "([^"]+)"/);
-    if (m && m[1] !== APP_VERSION && !sondeo){
+    if (m && m[1] !== APP_VERSION && !sondeo && !bSondeo){
       let ult = 0; try{ ult = +sessionStorage.getItem("bolsa_recarga")||0; }catch(e){}
       if (Date.now()-ult > 15000){ try{ sessionStorage.setItem("bolsa_recarga", Date.now()); }catch(e){} location.reload(); }
     }
