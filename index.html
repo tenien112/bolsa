@@ -1811,7 +1811,10 @@ async function buscar(q){
   const genL = bGen;
   try{ await dispara("buscar-lista.yml", {q, id}); }
   catch(e){ if (genL !== bGen) return; pintaOpciones(loc, "Elige cuál quieres:", false); if (!loc.length) bEstado(errLlave(e), "mal"); return; }
+  // Si mientras se lanzaba elegiste un valor o buscaste otra cosa, esta búsqueda ya no vale: no tocar nada
+  if (genL !== bGen) return;
   const inicio = Date.now(), gen = bGen;
+  clearInterval(bSondeo);
   bSondeo = setInterval(async () => {
     if (gen !== bGen) return;
     if (pantalla !== "pBuscar") return bParar();
@@ -1836,6 +1839,7 @@ async function descargar(ticker, nombre){
   try{ await dispara("buscar.yml", {q: "=" + ticker, id}); }catch(e){ if (genD === bGen) bEstado(errLlave(e), "mal"); return; }
   if (genD !== bGen) return;
   const inicio = Date.now(), gen = bGen;
+  clearInterval(bSondeo); clearInterval(bReloj);
   bReloj = setInterval(() => bEstado(`Descargando velas de ${quien}… ${Math.round((Date.now() - inicio) / 1000)} s (unos 40 s)`), 1000);
   bSondeo = setInterval(async () => {
     if (gen !== bGen) return;
@@ -1956,7 +1960,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.08-3";
+const APP_VERSION = "2026.11.08-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
