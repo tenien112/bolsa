@@ -975,6 +975,25 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
   caja._zv.forEach(([e, fn]) => caja.addEventListener(e, fn, {capture: true, passive: false}));
   G = {chart, serie, ultimo, iCambio: null, orig, dur: (+tf) * 60, tf, datos, cambio, titulo, tfsPedidas: tfs,
        tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
+  // GIRO DEL RADAR COMPLETO: precio al que todas las temporalidades del radar estarían a la vez en negativo (o en positivo)
+  if (datos.giro && G.tfs.length > 1){
+    const R = "color:#E5484D", V = "color:#2FBF71";
+    const calc = dir => {   // dir -1 bajista, 1 alcista
+      let p = null; const frena = [];
+      for (const t of G.tfs){
+        const gi = datos.giro[String(TF_MIN[t])], lim = gi && (dir < 0 ? gi.baja : gi.sube);
+        if (lim == null){ frena.push(t); continue; }
+        p = p == null ? lim : dir < 0 ? Math.min(p, lim) : Math.max(p, lim);
+      }
+      return {p, frena};
+    };
+    const b = calc(-1), a = calc(1), nom = G.tfs.join("-");
+    const txt = (o, dir) => o.frena.length ? `${dir < 0 ? "BAJISTA" : "ALCISTA"}: no alcanzable, ${o.frena.length > 1 ? "lo impiden " + o.frena.slice(0, -1).join(", ") + " y " + o.frena.at(-1) : "lo impide " + o.frena[0]}`
+      : `<b style="${dir < 0 ? R : V}">${dir < 0 ? "▼ BAJISTA por debajo de " : "▲ ALCISTA por encima de "}${fmtP(o.p, ultimo)}</b>`;
+    if (!b.frena.length) serie.createPriceLine({price: b.p, color: "#E5484D", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "▼ RADAR"});
+    if (!a.frena.length) serie.createPriceLine({price: a.p, color: "#2FBF71", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "▲ RADAR"});
+    $("gTit").insertAdjacentHTML("beforeend", `<small>🧭 Radar ${esc(nom)}: ${txt(b, -1)} · ${txt(a, 1)}</small>`);
+  }
   pintaPL();
   // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
   chart.subscribeCrosshairMove(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
@@ -1960,7 +1979,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.08-1";
+const APP_VERSION = "2026.11.08-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
