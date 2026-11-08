@@ -852,7 +852,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   $("graf").classList.add("on");
-  $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}<small>${cambio ? "📍 Último cambio: " + esc(cambio) + " (hora de Madrid)" : posiciones().some(p => p.sim === sim) ? "📌 Con tu posición dibujada" : "Sin hora de cambio en esta línea"}</small>`
+  $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}<small id="gCamb">${cambio ? "📍 " + esc(cambio) : posiciones().some(p => p.sim === sim) ? "📌 Con tu posición dibujada" : "Sin hora de cambio en esta línea"}</small>`
     + (selRadar ? `<select id="gRadSel" title="Radar con el que se calcula la línea amarilla">${B_RADARES.map((r, i) => `<option value="${i}"${i === selRadar.i ? " selected" : ""}>Radar ${esc(r.n)}</option>`).join("")}</select>` : "");
   if (selRadar) $("gRadSel").onchange = e => { store("bolsa_radar_buscar", +e.target.value); selRadar.cambia(+e.target.value, tf); };
   $("gTfs").innerHTML = Object.keys(TF_NOM).map(k => `<button data-tf="${k}" class="${k === tf ? "on" : ""}">${TF_NOM[k]}</button>`).join("");
@@ -900,15 +900,11 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
     const linea = (p, c, t) => serie.createPriceLine({price: p, color: c, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: t});
     if (gi.baja != null) linea(gi.baja, "#E5484D", "▼ BAJISTA");
     if (gi.sube != null) linea(gi.sube, "#2FBF71", "▲ ALCISTA");
-    const partes = [], R = "color:#E5484D", V = "color:#2FBF71";
-    if (gi.ahora === -1) partes.push(`<b style="${R}">BAJISTA</b>; deja de serlo si cierra por encima de ${fmtP(gi.baja, ultimo)}`);
-    else if (gi.baja != null) partes.push(`<b style="${R}">▼ BAJISTA si cierra por debajo de ${fmtP(gi.baja, ultimo)}</b>`);
-    if (gi.ahora === 1) partes.push(`<b style="${V}">ALCISTA</b>; deja de serlo si cierra por debajo de ${fmtP(gi.sube, ultimo)}`);
-    else if (gi.sube != null) partes.push(`<b style="${V}">▲ ALCISTA si cierra por encima de ${fmtP(gi.sube, ultimo)}</b>`);
-    if (!partes.length) partes.push("en esta vela no puede pasar a ALCISTA ni a BAJISTA (haría falta más de un 15 %)");
-    const cuando = cerrado ? "próxima vela" : `vela que cierra a las ${hh}`;
-    $("gTit").insertAdjacentHTML("beforeend", `<small>🎯 ${nombreTF(tf)}, ${cuando}: ${partes.join(" · ")}${viejo ? " (ya cerró: ejecuta un radar para recalcular)" : ""}</small>`);
-    notaGiro = " Líneas discontinuas: precio de giro de esta temporalidad (los 4 indicadores del radar en negativo por debajo de la roja, en positivo por encima de la verde) para la vela en curso.";
+    const R = "color:#E5484D", V = "color:#2FBF71", partes = [];
+    if (gi.baja != null) partes.push(`<b style="${R}">▼ ${fmtP(gi.baja, ultimo)}</b>`);
+    if (gi.sube != null) partes.push(`<b style="${V}">▲ ${fmtP(gi.sube, ultimo)}</b>`);
+    if (partes.length) $("gCamb").insertAdjacentHTML("beforeend", ` · 🎯 ${partes.join(" ")}${viejo ? " (recalcular)" : ""}`);
+    notaGiro = "";
   }
   // MACD (12, 26, 9) en la parte de abajo del gráfico, con su propia escala. Botón MACD para quitarlo o ponerlo (se guarda)
     const m = calculaMACD(velas.map(v => v.close));
@@ -975,31 +971,12 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
   caja._zv.forEach(([e, fn]) => caja.addEventListener(e, fn, {capture: true, passive: false}));
   G = {chart, serie, ultimo, iCambio: null, orig, dur: (+tf) * 60, tf, datos, cambio, titulo, tfsPedidas: tfs,
        tfs: (tfs && tfs.length) ? tfs : Object.keys(TF_MIN).filter(k => datos.radar && datos.radar[String(TF_MIN[k])])};
-  // GIRO DEL RADAR COMPLETO: precio al que todas las temporalidades del radar estarían a la vez en negativo (o en positivo)
-  if (datos.giro && G.tfs.length > 1){
-    const R = "color:#E5484D", V = "color:#2FBF71";
-    const calc = dir => {   // dir -1 bajista, 1 alcista
-      let p = null; const frena = [];
-      for (const t of G.tfs){
-        const gi = datos.giro[String(TF_MIN[t])], lim = gi && (dir < 0 ? gi.baja : gi.sube);
-        if (lim == null){ frena.push(t); continue; }
-        p = p == null ? lim : dir < 0 ? Math.min(p, lim) : Math.max(p, lim);
-      }
-      return {p, frena};
-    };
-    const b = calc(-1), a = calc(1), nom = G.tfs.join("-");
-    const txt = (o, dir) => o.frena.length ? `${dir < 0 ? "BAJISTA" : "ALCISTA"}: no alcanzable, ${o.frena.length > 1 ? "lo impiden " + o.frena.slice(0, -1).join(", ") + " y " + o.frena.at(-1) : "lo impide " + o.frena[0]}`
-      : `<b style="${dir < 0 ? R : V}">${dir < 0 ? "▼ BAJISTA por debajo de " : "▲ ALCISTA por encima de "}${fmtP(o.p, ultimo)}</b>`;
-    if (!b.frena.length) serie.createPriceLine({price: b.p, color: "#E5484D", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "▼ RADAR"});
-    if (!a.frena.length) serie.createPriceLine({price: a.p, color: "#2FBF71", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "▲ RADAR"});
-    $("gTit").insertAdjacentHTML("beforeend", `<small>🧭 Radar ${esc(nom)}: ${txt(b, -1)} · ${txt(a, 1)}</small>`);
-  }
   pintaPL();
   // Al tocar o arrastrar el dedo sobre una vela: cómo estaba el radar en ese momento
   chart.subscribeCrosshairMove(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
   chart.subscribeClick(p => { if (p && p.time != null) pintaRadar(p.time, p.point && p.point.x); });
   const tC = cambioASeg(cambio), dur = (+tf) * 60, n = velas.length;
-  let nota = `Velas de ${nombreTF(tf)} en hora de Madrid · guardadas ${hace(datos.actualizado)}.`;
+  let nota = `Guardadas ${hace(datos.actualizado)}.`;
   if (tC != null){
     let i = -1; for (let k = 0; k < n; k++){ if (velas[k].time <= tC) i = k; else break; }
     if (i < 0) nota += " El cambio es anterior a estas velas: pulsa una temporalidad mayor.";
@@ -1018,7 +995,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
     if (pe != null){ let k = 0; while (k < n && velas[k].time <= pe) k++; i0 = Math.min(k - 25, n - 90); }
     chart.timeScale().setVisibleLogicalRange({from: Math.max(0, i0), to: n + 4});
   }
-  $("gNota").textContent = notaPos + nota + notaGiro + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Junto a la línea amarilla, el signo de cada temporalidad en el momento del cambio (subrayadas y con flechas según el orden en que cambiaron, como en los radares). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca de lado para ampliar a lo ancho. Para la altura: botones ↕+ / ↕− o pellizca con los dedos uno encima del otro (AUTO lo deja como estaba).";
+  $("gNota").textContent = notaPos + nota;
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -1979,7 +1956,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.08-2";
+const APP_VERSION = "2026.11.08-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
