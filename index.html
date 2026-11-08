@@ -889,6 +889,27 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
     priceFormat: {type:"price", precision: dec, minMove: Math.pow(10, -dec)}});
   serie.setData(velas);
   const notaPos = dibujaPosiciones(sim, serie, velas, L);
+  // PRECIO DE GIRO: a qué precio tiene que cerrar la vela en curso para que esta temporalidad pase a BAJISTA o ALCISTA
+  // (lo calcula velas.py en forex-alertas con los mismos 4 indicadores del radar)
+  const gi = (datos.giro || {})[tf];
+  let notaGiro = "";
+  if (gi){
+    const hh = new Date(gi.cierre * 1000).toLocaleTimeString("es-ES", {timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit"});
+    const cerrado = gi.cierre <= (datos.actualizado || 0);    // mercado cerrado al calcularlo: vale para la próxima vela
+    const viejo = !cerrado && Date.now() / 1000 > gi.cierre;
+    const linea = (p, c, t) => serie.createPriceLine({price: p, color: c, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: t});
+    if (gi.baja != null) linea(gi.baja, "#E5484D", "▼ BAJISTA");
+    if (gi.sube != null) linea(gi.sube, "#2FBF71", "▲ ALCISTA");
+    const partes = [], R = "color:#E5484D", V = "color:#2FBF71";
+    if (gi.ahora === -1) partes.push(`<b style="${R}">BAJISTA</b>; deja de serlo si cierra por encima de ${fmtP(gi.baja, ultimo)}`);
+    else if (gi.baja != null) partes.push(`<b style="${R}">▼ BAJISTA si cierra por debajo de ${fmtP(gi.baja, ultimo)}</b>`);
+    if (gi.ahora === 1) partes.push(`<b style="${V}">ALCISTA</b>; deja de serlo si cierra por debajo de ${fmtP(gi.sube, ultimo)}`);
+    else if (gi.sube != null) partes.push(`<b style="${V}">▲ ALCISTA si cierra por encima de ${fmtP(gi.sube, ultimo)}</b>`);
+    if (!partes.length) partes.push("en esta vela no puede pasar a ALCISTA ni a BAJISTA (haría falta más de un 15 %)");
+    const cuando = cerrado ? "próxima vela" : `vela que cierra a las ${hh}`;
+    $("gTit").insertAdjacentHTML("beforeend", `<small>🎯 ${nombreTF(tf)}, ${cuando}: ${partes.join(" · ")}${viejo ? " (ya cerró: ejecuta un radar para recalcular)" : ""}</small>`);
+    notaGiro = " Líneas discontinuas: precio de giro de esta temporalidad (los 4 indicadores del radar en negativo por debajo de la roja, en positivo por encima de la verde) para la vela en curso.";
+  }
   // MACD (12, 26, 9) en la parte de abajo del gráfico, con su propia escala. Botón MACD para quitarlo o ponerlo (se guarda)
     const m = calculaMACD(velas.map(v => v.close));
   const sM = {priceScaleId: "macd", priceFormat: {type: "price", precision: dec + 1, minMove: Math.pow(10, -(dec + 1))}, lastValueVisible: false, priceLineVisible: false};
@@ -978,7 +999,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
     if (pe != null){ let k = 0; while (k < n && velas[k].time <= pe) k++; i0 = Math.min(k - 25, n - 90); }
     chart.timeScale().setVisibleLogicalRange({from: Math.max(0, i0), to: n + 4});
   }
-  $("gNota").textContent = notaPos + nota + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Junto a la línea amarilla, el signo de cada temporalidad en el momento del cambio (subrayadas y con flechas según el orden en que cambiaron, como en los radares). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca de lado para ampliar a lo ancho. Para la altura: botones ↕+ / ↕− o pellizca con los dedos uno encima del otro (AUTO lo deja como estaba).";
+  $("gNota").textContent = notaPos + nota + notaGiro + " Abajo, el MACD (12, 26, 9): azul MACD, naranja señal (quítalo o ponlo con el botón MACD). Junto a la línea amarilla, el signo de cada temporalidad en el momento del cambio (subrayadas y con flechas según el orden en que cambiaron, como en los radares). Toca una vela para ver cómo estaba el radar en ese momento. Desliza para moverte y pellizca de lado para ampliar a lo ancho. Para la altura: botones ↕+ / ↕− o pellizca con los dedos uno encima del otro (AUTO lo deja como estaba).";
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
   setTimeout(colocaLinea, 50);
@@ -1939,7 +1960,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.07-6";
+const APP_VERSION = "2026.11.08-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
