@@ -400,6 +400,7 @@ const VIG = {
     {n:"RADAR M5-M30-H1-H2-H4", d:"5 y 30 min, 1 h, 2 h y 4 h · el de COMUNES M5-H4", wf:"radar-m5h4.yml", p:"VIGILANTE RADAR M5-M30-H1-H2-H4", partes:1},
     {n:"RADAR M30-H1-H2-H4", d:"30 min, 1 h, 2 h y 4 h · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-m30h4.yml", p:"VIGILANTE RADAR M30-H1-H2-H4", partes:1},
     {n:"RADAR M5-M30-H1-H2", d:"5 y 30 min, 1 h y 2 h · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-m5h2.yml", p:"VIGILANTE RADAR M5-M30-H1-H2", partes:1},
+    {n:"RADAR M5-M15-M30-H1", d:"5, 15 y 30 min y 1 h · mismos mercados que el RADAR CAMBIO TENDENCIAS", wf:"radar-m5h1.yml", p:"VIGILANTE RADAR M5-M15-M30-H1", partes:1},
   ]
 };
 
@@ -1647,6 +1648,7 @@ const B_RADARES = [
   {n: "M30-H1-H2-H4", tfs: ["M30", "H1", "H2", "H4"]},
   {n: "M5-M30-H1-H2-H4", tfs: ["M5", "M30", "H1", "H2", "H4"]},
   {n: "M5-M30-H1-H2", tfs: ["M5", "M30", "H1", "H2"]},
+  {n: "M5-M15-M30-H1", tfs: ["M5", "M15", "M30", "H1"]},
   {n: "M5-M15-M30-H1-H2-H4", tfs: ["M5", "M15", "M30", "H1", "H2", "H4"]},
   {n: "5 TEMPORALIDADES (M30-H1-H2-H4-H8)", tfs: ["M30", "H1", "H2", "H4", "H8"]},
 ];
@@ -1962,7 +1964,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.09-1";
+const APP_VERSION = "2026.11.09-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
