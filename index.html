@@ -727,7 +727,7 @@ function cambioASeg(txt){
 const velasCache = {};
 async function leeVelas(sim){
   const c = velasCache[sim];
-  if (c && Date.now() - c.leido < 60000) return c.datos;
+  if (c && Date.now() - c.leido < 60000) return mezclaHist(c.datos, histCache[sim] && histCache[sim].datos);
   const r = await fetch(`https://api.github.com/repos/${REPO}/contents/velas/${sim}.json?t=${Date.now()}`, {
     headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github.raw+json"}, cache:"no-store"});
   if (r.status === 404) throw new Error("sinvelas");
@@ -735,7 +735,42 @@ async function leeVelas(sim){
   if (!r.ok) throw new Error("GitHub respondió " + r.status);
   const datos = await r.json();
   velasCache[sim] = {leido: Date.now(), datos};
-  return datos;
+  return mezclaHist(datos, histCache[sim] && histCache[sim].datos);
+}
+// --- Historial largo de cTrader (rama «historial» de forex-alertas, se actualiza una vez al día) ---
+// Se carga en segundo plano al abrir un gráfico y se une por delante de las velas recientes.
+const histCache = {}, histCargando = {};
+async function cargaHistorial(sim){
+  if (histCache[sim] && Date.now() - histCache[sim].leido < 30 * 60000) return false;
+  if (histCargando[sim]) return false;
+  histCargando[sim] = true;
+  try{
+    const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${sim}.json.gz?ref=historial&t=${Date.now()}`, {
+      headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github.raw+json"}, cache:"no-store"});
+    if (!r.ok){ histCache[sim] = {leido: Date.now(), datos: null}; return false; }
+    const flujo = r.body.pipeThrough(new DecompressionStream("gzip"));
+    const datos = JSON.parse(await new Response(flujo).text());
+    histCache[sim] = {leido: Date.now(), datos};
+    return true;
+  }catch(e){ histCache[sim] = {leido: Date.now(), datos: null}; return false; }
+  finally{ histCargando[sim] = false; }
+}
+function mezclaHist(rec, hist){
+  // Solo se unen si las velas recientes también son de cTrader (Yahoo y cTrader no dan el mismo precio, p. ej. en el oro)
+  if (!hist || !rec || rec.fuente !== "ctrader") return rec;
+  const out = {...rec, tf: {}, radar: {}, conHist: true};
+  const ks = new Set([...Object.keys(rec.tf || {}), ...Object.keys(hist.tf || {})]);
+  ks.forEach(k => {
+    const r = (rec.tf || {})[k] || [], h = (hist.tf || {})[k] || [];
+    if (!r.length){ out.tf[k] = h; out.radar[k] = (hist.radar || {})[k] || []; return; }
+    const ini = r[0][0], fin = r[r.length - 1][0];
+    out.tf[k] = [...h.filter(v => v[0] < ini), ...r, ...h.filter(v => v[0] > fin)];
+    const rr = (rec.radar || {})[k] || [], hr = (hist.radar || {})[k] || [];
+    const todo = [...hr.filter(x => x[0] < ini), ...rr.filter(x => x[0] >= ini)], sal = [];
+    todo.forEach(x => { if (!sal.length || sal[sal.length - 1][1] !== x[1]) sal.push(x); });
+    out.radar[k] = sal;
+  });
+  return out;
 }
 let G = null;   // {chart, serie, iCambio}
 let simGraf = null, simTV = null;   // mercado del gráfico abierto
@@ -869,6 +904,9 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
     return;
   }
   if (!$("graf").classList.contains("on") || miSeq !== grafSeq) return;
+  // En segundo plano: historial largo de cTrader; cuando llega, se vuelve a dibujar con él
+  if (!datos.conHist && datos.fuente === "ctrader")
+    cargaHistorial(sim).then(ok => { if (ok && miSeq === grafSeq && $("graf").classList.contains("on")) abreGraf(sim, tf, cambio, titulo, tfs, selRadar); });
   if (G && G.chart) G.chart.remove();
   limpiaCaja();   // nunca dos gráficos montados a la vez
   if (!TF_NOM[tf]) tf = "240";
@@ -1964,7 +2002,7 @@ $("year").textContent = new Date().getFullYear();
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.09-2";
+const APP_VERSION = "2026.11.09-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
