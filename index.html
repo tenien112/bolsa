@@ -1437,7 +1437,7 @@ $("comRepetir").onclick = () => comunes(V_RADAR);
 const MERCADOS = [
   ["XAUUSD","ORO (GOLD)","OANDA:XAUUSD"],["XAGUSD","PLATA (SILVER)","OANDA:XAGUSD"],["XPTUSD","PLATINO","OANDA:XPTUSD"],["XPDUSD","PALADIO","OANDA:XPDUSD"],
   ["USOIL","PETRÓLEO WTI (OIL.WTI)","TVC:USOIL"],["BTCUSD","BITCOIN","BITSTAMP:BTCUSD"],["ETHUSD","ETHEREUM","BITSTAMP:ETHUSD"],
-  ...["AUDUSD","EURAUD","EURCAD","EURCHF","EURCNH","EURGBP","EURJPY","EURUSD","GBPAUD","GBPCAD","GBPCHF","GBPJPY","GBPUSD","USDCAD","USDCHF","USDCNH","USDJPY"]
+  ...["AUDUSD","CHFJPY","EURAUD","EURCAD","EURCHF","EURCNH","EURGBP","EURJPY","EURUSD","GBPAUD","GBPCAD","GBPCHF","GBPJPY","GBPUSD","USDCAD","USDCHF","USDCNH","USDJPY"]
     .map(x => [x, x.slice(0,3) + "/" + x.slice(3), (x.includes("CNH") ? "FX_IDC:" : "FX:") + x])
 ];
 const merDe = sim => MERCADOS.find(m => m[0] === sim) || (b => b ? [sim, b.nombre, b.tv || sim] : [sim, sim, "FX:" + sim])([...(store("bolsa_favoritos") || []), ...(store("bolsa_buscados") || [])].find(x => x.sim === sim));
@@ -2614,7 +2614,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-16";
+const APP_VERSION = "2026.11.10-chfjpy";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
