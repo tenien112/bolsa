@@ -382,8 +382,9 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
     <h3 id="hojaTit"></h3>
     <div class="cambio" id="hojaCambio"></div>
     <p class="sub">¿Dónde lo quieres abrir?</p>
+    <button class="eleg e-graf" id="abreGrafIG"><span class="e">🏦</span><span>Gráfico IG con la línea del cambio<small>Compra y vende de verdad en tu cuenta de IG</small></span></button>
     <button class="eleg e-graf" id="abreGraf"><span class="e">📍</span><span>Gráfico con la línea del cambio<small id="grafSub">Aquí en la app, con una línea en la hora exacta</small></span></button>
-    <button class="eleg e-graf" id="abreGrafCT"><span class="e">📊</span><span>Gráfico cTrader con la línea del cambio<small>Lo mismo, con los precios de cTrader y 3 años de historial</small></span></button>
+    <button class="eleg e-graf" id="abreGrafCT"><span class="e">📊</span><span>Gráfico cTrader con la línea del cambio<small>Precios de cTrader y 3 años de historial (los botones solo apuntan, no operan)</small></span></button>
     <button class="eleg e-tv" id="abreTV"><span class="e">📈</span><span>TradingView<small>Se abre en el gráfico de este mercado</small></span></button>
     <button class="eleg e-web" id="abreXTBWeb"><span class="e">🌐</span><span>XTB en el navegador<small class="xtbSub"></small></span></button>
     <button class="eleg e-xtb" id="abreXTB"><span class="e">📱</span><span>App de XTB<small class="xtbSub"></small></span></button>
@@ -1152,8 +1153,16 @@ $("gPosB").onclick = () => {
   });
   L.classList.add("on");
 };
-$("abreGrafCT").onclick = () => { fuenteGraf = "ctrader"; abreGrafElegido(); };
-$("abreGraf").onclick = () => { fuenteGraf = "yahoo"; abreGrafElegido(); };
+// grafIG: el gráfico abierto opera en IG (COMPRAR / VENDER de verdad)
+let grafIG = false;
+const tL = () => grafIG ? "▲ COMPRAR" : "▲ LARGO", tC = () => grafIG ? "▼ VENDER" : "▼ CORTO";
+const pintaOpTxt = () => { $("gLargo").textContent = tL(); $("gCorto").textContent = tC(); };
+$("abreGrafCT").onclick = () => { grafIG = false; pintaOpTxt(); fuenteGraf = "ctrader"; abreGrafElegido(); };
+$("abreGraf").onclick = () => { grafIG = false; pintaOpTxt(); fuenteGraf = "yahoo"; abreGrafElegido(); };
+$("abreGrafIG").onclick = () => {
+  if (!igListo()){ cierraHoja(); toast("Primero conecta IG (usuario, contraseña y clave API)", 4000); $("bIG").onclick(); return; }
+  grafIG = true; pintaOpTxt(); fuenteGraf = "yahoo"; abreGrafElegido();
+};
 function abreGrafElegido(){
   if (!elegido) return;
   const e = elegido; cierraHoja(); abreCapa();   // la hoja deja su sitio en el historial al gráfico
@@ -1492,26 +1501,26 @@ async function pintaPosiciones(){
 const loteDef = () => store("bolsa_lote") || 0.01;
 $("gLote").value = loteDef();
 $("gLote").onchange = () => { const v = +String($("gLote").value).replace(",", ".");
-  if (v > 0 && typeof igListo === "function" && igListo() && IG.epicAct){ const t = store("bolsa_ig_tam") || {}; t[IG.epicAct] = v; store("bolsa_ig_tam", t); toast("Tamaño IG guardado: " + String(v).replace(".", ","), 2000); return; }
+  if (v > 0 && grafIG && typeof igListo === "function" && igListo() && IG.epicAct){ const t = store("bolsa_ig_tam") || {}; t[IG.epicAct] = v; store("bolsa_ig_tam", t); toast("Tamaño IG guardado: " + String(v).replace(".", ","), 2000); return; }
   if (v > 0){ store("bolsa_lote", v); toast("Lote guardado: " + String(v).replace(".", ","), 2000); } else $("gLote").value = loteDef(); };
 function rapida(dir, b){
   if (!G || !simGraf || G.ultimo == null){ toast("Espera a que carguen las velas", 2500); return; }
-  if (igListo() && !b.dataset.seguro){ /* primera pulsación: igual que siempre, pide otra */ }
-  else if (igListo()){ delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? "▲ LARGO" : "▼ CORTO"; igOperar(dir); return; }
+  if (grafIG && igListo() && !b.dataset.seguro){ /* primera pulsación: igual que siempre, pide otra */ }
+  else if (grafIG && igListo()){ delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? tL() : tC(); igOperar(dir); return; }
   if (!b.dataset.seguro){
-    document.querySelectorAll("#gOp button").forEach(x => { delete x.dataset.seguro; x.classList.remove("seg2"); x.textContent = x.id === "gLargo" ? "▲ LARGO" : "▼ CORTO"; });
-    b.dataset.seguro = 1; b.classList.add("seg2"); b.textContent = "¿" + (dir === "L" ? "LARGO" : "CORTO") + "? Otra vez";
-    setTimeout(() => { if (b.dataset.seguro){ delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? "▲ LARGO" : "▼ CORTO"; } }, 4000);
+    document.querySelectorAll("#gOp button").forEach(x => { delete x.dataset.seguro; x.classList.remove("seg2"); x.textContent = x.id === "gLargo" ? tL() : tC(); });
+    b.dataset.seguro = 1; b.classList.add("seg2"); b.textContent = "¿" + (dir === "L" ? tL() : tC()).slice(2) + "? Otra vez";
+    setTimeout(() => { if (b.dataset.seguro){ delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? tL() : tC(); } }, 4000);
     return;
   }
-  delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? "▲ LARGO" : "▼ CORTO";
+  delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? tL() : tC();
   const v = +String($("gLote").value).replace(",", "."), lote = v > 0 ? v : loteDef();
   store("bolsa_lote", lote);
   const sim = simGraf, tv = MERCADOS.some(m => m[0] === sim) ? merDe(sim)[2] : (simTV || merDe(sim)[2]);
   const p = {id: String(Date.now()), sim, tv, dir, precio: G.ultimo, hora: Math.floor(Date.now() / 1000), sl: null, tp: null, lote};
   const l = posiciones(); l.push(p); l.sort((a, c) => c.hora - a.hora); guardaPos(l);
   if (navigator.vibrate) try{ navigator.vibrate(60); }catch(e){}
-  toast((dir === "L" ? "▲ LARGO" : "▼ CORTO") + " apuntado: lote " + String(lote).replace(".", ",") + " a " + fmtP(G.ultimo) + ". Si en XTB entraste a otro precio, cámbialo en MIS POSICIONES.", 4500);
+  toast((dir === "L" ? tL() : tC()) + " apuntado: lote " + String(lote).replace(".", ",") + " a " + fmtP(G.ultimo) + ". Si en XTB entraste a otro precio, cámbialo en MIS POSICIONES.", 4500);
   abreGraf(simGraf, G.tf, G.cambio, G.titulo, G.tfsPedidas);
 }
 $("gLargo").onclick = function(){ rapida("L", this); };
@@ -2254,7 +2263,7 @@ async function igOperar(dir){
     if (!c) throw new Error("IG no confirma la orden: mira tus posiciones");
     if (c.dealStatus !== "ACCEPTED") throw new Error(igErr(c.reason));
     if (navigator.vibrate) try{ navigator.vibrate([60, 60, 60]); }catch(e){}
-    toast(`✅ IG ${igModo()}: ${dir === "L" ? "▲ LARGO" : "▼ CORTO"} ${merDe(sim)[1]} · tamaño ${String(tam).replace(".", ",")} a ${igNum(c.level)} · SL −${(dSL * eurPunto).toFixed(2).replace(".", ",")} € · TP +${(dTP * eurPunto).toFixed(2).replace(".", ",")} €${aviso}`, 7000);
+    toast(`✅ IG ${igModo()}: ${dir === "L" ? tL() : tC()} ${merDe(sim)[1]} · tamaño ${String(tam).replace(".", ",")} a ${igNum(c.level)} · SL −${(dSL * eurPunto).toFixed(2).replace(".", ",")} € · TP +${(dTP * eurPunto).toFixed(2).replace(".", ",")} €${aviso}`, 7000);
     await igPintaPos();
   }catch(e){ toast("❌ IG: " + e.message, 6000); }
   finally{ IG.pidiendo = false; }
@@ -2302,7 +2311,7 @@ async function igPintaPos(){
 // En el gráfico: precio de IG en vivo y tus posiciones de IG de ese mercado
 function igPintaGraf(pls){
   const caja = $("gIG");
-  if (!igListo() || !simGraf || !IG.epicAct){ caja.style.display = "none"; $("gLoteT").textContent = "LOTE"; return; }
+  if (!grafIG || !igListo() || !simGraf || !IG.epicAct){ caja.style.display = "none"; $("gLoteT").textContent = "LOTE"; return; }
   $("gLoteT").textContent = "IG";
   const d = IG.mer[IG.epicAct], s = d && d.snap;
   const l = IG.pos.map((p, i) => [p, pls ? pls[i] : null]).filter(([p]) => p.market.epic === IG.epicAct);
@@ -2313,7 +2322,7 @@ function igPintaGraf(pls){
 // Cada 3 s con el gráfico abierto: precio de IG, actualiza la última vela; cada 15 s, las posiciones
 let igTick = 0;
 setInterval(async () => {
-  if (!igListo() || !G || !simGraf || !$("graf").classList.contains("on") || document.visibilityState !== "visible"){ if (!$("graf").classList.contains("on")) IG.simAct = null; return; }
+  if (!grafIG || !igListo() || !G || !simGraf || !$("graf").classList.contains("on") || document.visibilityState !== "visible"){ if (!$("graf").classList.contains("on")) IG.simAct = null; return; }
   try{
     if (IG.simAct !== simGraf){
       IG.simAct = simGraf; IG.epicAct = null; $("gIG").style.display = "none";
@@ -2454,7 +2463,7 @@ if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-4";
+const APP_VERSION = "2026.11.10-5";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
