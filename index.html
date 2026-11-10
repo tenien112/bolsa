@@ -114,6 +114,10 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .cambio small{display:block;font:500 13px Archivo,sans-serif;color:var(--mut);margin-bottom:2px}
 #graf{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;padding:max(12px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom))}
 #graf.on{display:flex}
+#igBar{position:fixed;top:0;left:0;right:0;z-index:30;display:none;justify-content:center;gap:14px;padding:calc(env(safe-area-inset-top) + 2px) 8px 2px;background:rgba(14,26,20,.94);border-bottom:1px solid var(--line);font:700 11px "JetBrains Mono",monospace;color:var(--mut);white-space:nowrap;overflow:hidden}
+#igBar b{color:var(--txt)}#igBar .g{color:var(--verde)}#igBar .p{color:var(--rojo)}
+body.conIG{padding-top:calc(max(16px,env(safe-area-inset-top)) + 20px)}
+body.conIG #graf,body.conIG #hoja,body.conIG #posF{top:calc(env(safe-area-inset-top) + 19px)}
 #graf .cab{display:flex;align-items:center;gap:8px;position:relative}
 #gPosB{position:relative}#gPosB i{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:var(--oro);color:#0E1A14;font:700 11px/17px "JetBrains Mono",monospace;font-style:normal;padding:0 3px}
 #gPosL{display:none;position:absolute;top:calc(max(12px,env(safe-area-inset-top)) + 52px);right:10px;left:10px;z-index:20;background:#16261D;border:1px solid var(--oro);border-radius:14px;padding:6px;max-height:60vh;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.6)}
@@ -244,6 +248,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 </style>
 </head>
 <body>
+<div id="igBar"></div>
 <header>
   <h1>BOLSA-<span>LORENZITO</span></h1>
   <button class="ico" id="bLlave" title="Llave de GitHub" aria-label="Ajustes">⚙️</button>
@@ -2213,7 +2218,21 @@ async function igConectar(){
   igPintaCtas();
   pintaIGEst(); igPintaPos();
 }
+function igBarra(){
+  const el = $("igBar");
+  if (!igListo() || !IG.cuenta || !IG.cuenta.balance){ el.style.display = "none"; document.body.classList.remove("conIG"); return; }
+  const b = IG.cuenta.balance, f = v => (+v || 0).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const pl = +b.profitLoss || 0;
+  el.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG</span><span>Saldo <b>${f(b.balance)} €</b></span><span>Abierto <b class="${pl > 0 ? "g" : pl < 0 ? "p" : ""}">${pl >= 0 ? "+" : "−"}${f(Math.abs(pl))} €</b></span><span>Margen <b>${f(b.deposit)} €</b></span>`;
+  el.style.display = "flex"; document.body.classList.add("conIG");
+}
+// Cada 20 s (con la app a la vista) se refresca el saldo de IG
+setInterval(async () => {
+  if (!igListo() || document.visibilityState !== "visible") return;
+  try{ const a = await ig("/accounts"); IG.cuenta = (a.accounts || []).find(c => c.accountId === IG.cuenta.accountId) || IG.cuenta; igBarra(); if ($("pIG").classList.contains("on")) pintaIGEst(); }catch(e){}
+}, 20000);
 function pintaIGEst(t){
+  igBarra();
   const el = $("igEst");
   if (t){ el.innerHTML = t; return; }
   if (!igListo()){ el.innerHTML = IG.cfg && IG.cfg.usr ? "Sin conectar. Pulsa Conectar." : "Sin conectar. Rellena tus datos y pulsa Conectar."; $("bIG").innerHTML = '<span class="e">🏦</span>IG'; return; }
@@ -2560,14 +2579,14 @@ $("igSalir").onclick = () => {
   if (!b.dataset.seguro){ b.dataset.seguro = 1; b.textContent = "¿Seguro? Pulsa otra vez"; setTimeout(() => { delete b.dataset.seguro; b.textContent = "Desconectar y borrar datos de IG"; }, 4000); return; }
   IG.cfg = null; IG.tok = null; IG.cuenta = null; IG.pos = []; $("igCtaC").style.display = "none"; $("igCos").innerHTML = ""; IG.epics = {}; store("bolsa_ig", null); store("bolsa_ig_epics", {});
   igCargaForm(); pintaIGEst(); $("igPos").innerHTML = '<p class="sub">—</p>'; b.textContent = "Desconectar y borrar datos de IG"; delete b.dataset.seguro;
-  toast("Datos de IG borrados de este móvil", 3000);
+  igBarra(); toast("Datos de IG borrados de este móvil", 3000);
 };
 // Al abrir la app, si ya había datos de IG, se conecta sola
 if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {});
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-12";
+const APP_VERSION = "2026.11.10-13";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
