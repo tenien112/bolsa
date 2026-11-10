@@ -384,7 +384,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
     <h3 id="hojaTit"></h3>
     <div class="cambio" id="hojaCambio"></div>
     <p class="sub">¿Dónde lo quieres abrir?</p>
-    <button class="eleg e-graf" id="abreGrafIG"><span class="e">🏦</span><span>Gráfico IG con la línea del cambio<small>Compra y vende de verdad en tu cuenta de IG</small></span></button>
+    <button class="eleg e-graf" id="abreGrafIG"><span class="e">🏦</span><span>Gráfico cTrader · operar en IG<small>Velas de cTrader y COMPRAR / VENDER de verdad en tu cuenta de IG</small></span></button>
     <button class="eleg e-graf" id="abreGraf"><span class="e">📍</span><span>Gráfico con la línea del cambio<small id="grafSub">Aquí en la app, con una línea en la hora exacta</small></span></button>
     <button class="eleg e-graf" id="abreGrafCT"><span class="e">📊</span><span>Gráfico cTrader con la línea del cambio<small>Precios de cTrader y 3 años de historial (los botones solo apuntan, no operan)</small></span></button>
     <button class="eleg e-tv" id="abreTV"><span class="e">📈</span><span>TradingView<small>Se abre en el gráfico de este mercado</small></span></button>
@@ -1163,7 +1163,7 @@ $("abreGrafCT").onclick = () => { grafIG = false; pintaOpTxt(); fuenteGraf = "ct
 $("abreGraf").onclick = () => { grafIG = false; pintaOpTxt(); fuenteGraf = "yahoo"; abreGrafElegido(); };
 $("abreGrafIG").onclick = () => {
   if (!igListo()){ cierraHoja(); toast("Primero conecta IG (usuario, contraseña y clave API)", 4000); $("bIG").onclick(); return; }
-  grafIG = true; pintaOpTxt(); fuenteGraf = "yahoo"; abreGrafElegido();
+  grafIG = true; pintaOpTxt(); fuenteGraf = "ctrader"; abreGrafElegido();   // velas de cTrader, operaciones en IG
 };
 function abreGrafElegido(){
   if (!elegido) return;
@@ -2465,7 +2465,7 @@ if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-6";
+const APP_VERSION = "2026.11.10-6b";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
