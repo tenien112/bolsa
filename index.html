@@ -282,6 +282,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <label>Contraseña de IG</label><input id="igPwd" type="password" autocomplete="current-password">
   <label>Clave API (My IG → Configuración → Claves API)</label><input id="igKey" autocapitalize="off" autocomplete="off">
   <button class="btn" id="igCon">Conectar</button>
+  <a class="btn sec" href="https://www.ig.com/es/myig" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:8px">🌐 Abrir la plataforma de IG</a>
   <h3 style="margin-top:22px">Posiciones abiertas en IG</h3>
   <div id="igPos"><p class="sub">—</p></div>
   <button class="btn sec" id="igAct">↻ Actualizar</button>
@@ -2613,7 +2614,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-15";
+const APP_VERSION = "2026.11.10-16";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
