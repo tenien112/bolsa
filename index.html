@@ -166,6 +166,17 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 
 .g-pos{background:#C9A2FF}
 .g-buscar{background:#7FD3FF}
+.g-ig{background:#FFB37F}
+#pIG label{display:block;font-size:13px;color:var(--mut);margin-top:8px}
+#pIG input{margin:4px 0}
+#pIG .seg{display:flex;gap:8px;margin:6px 0}#pIG .seg button{flex:1;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:900 14px Archivo,sans-serif;cursor:pointer}
+#pIG .seg button.on{background:var(--oro);color:#0E1A14}#pIG .seg button.real.on{background:var(--rojo);color:#fff}
+#igEst{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0;font-size:14px;line-height:1.5}
+.igp{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:6px 0;font-size:14px}
+.igp .t{flex:1}.igp small{display:block;color:var(--mut);font-size:12px}.igp .g{color:var(--verde)}.igp .p{color:var(--rojo)}
+.igp button{background:var(--rojo);color:#fff;border:0;border-radius:8px;padding:6px 10px;font:900 12px Archivo,sans-serif;cursor:pointer}
+#gIG{display:none;font:700 11px "JetBrains Mono",monospace;color:var(--mut);margin-top:4px}
+#gIG .igp{font:700 12px Archivo,sans-serif;padding:4px 8px;margin:3px 0}
 .bRow{display:flex;gap:8px}.bRow input{flex:1;margin:0}.bRow .btn{width:auto;margin:0;padding:0 18px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
 .chips button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font:700 13px Archivo,sans-serif;cursor:pointer}
@@ -230,8 +241,30 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
     <button class="grande g-comunes" data-ir="pComMenu"><span class="e">🤝</span>COMUNES</button>
     <button class="grande g-pos" id="bPos"><span class="e">📌</span>MIS POSICIONES</button>
     <button class="grande g-buscar" id="bBuscar"><span class="e">🔎</span>BUSCAR VALOR</button>
+    <button class="grande g-ig" id="bIG"><span class="e">🏦</span>IG</button>
   </div>
   <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
+</section>
+
+<!-- IG -->
+<section class="pant" id="pIG">
+  <button class="volver" data-ir="pInicio">← Volver</button>
+  <h2>🏦 IG</h2>
+  <p class="sub">Tu cuenta de IG dentro de la app. Con IG conectada, los botones LARGO y CORTO del gráfico abren la operación de verdad en IG, con su stop loss y take profit en euros. Los datos se guardan solo en este móvil.</p>
+  <div id="igEst">Sin conectar</div>
+  <div class="seg"><button id="igDemo" class="on">DEMO</button><button id="igReal" class="real">REAL</button></div>
+  <label>Usuario de IG</label><input id="igUsr" autocomplete="username" autocapitalize="off">
+  <label>Contraseña de IG</label><input id="igPwd" type="password" autocomplete="current-password">
+  <label>Clave API (My IG → Configuración → Claves API)</label><input id="igKey" autocapitalize="off" autocomplete="off">
+  <div class="dos">
+    <div><label>Stop loss (€)</label><input id="igSL" type="number" step="0.5" min="1" inputmode="decimal"></div>
+    <div><label>Take profit (€)</label><input id="igTP" type="number" step="0.5" min="1" inputmode="decimal"></div>
+  </div>
+  <button class="btn" id="igCon">Conectar</button>
+  <h3 style="margin-top:22px">Posiciones abiertas en IG</h3>
+  <div id="igPos"><p class="sub">—</p></div>
+  <button class="btn sec" id="igAct">↻ Actualizar</button>
+  <button class="btn sec" id="igSalir">Desconectar y borrar datos de IG</button>
 </section>
 
 <!-- ROBOTS -->
@@ -357,7 +390,8 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <div id="gPosL"></div>
   <div id="gTfs"></div>
   <div id="gCaja"><div id="gPL"></div><div id="gLinea"><span id="gEtq"></span><div id="gSig"></div></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
-  <div id="gOp"><button class="l" id="gLargo">▲ LARGO</button><label>LOTE<input id="gLote" type="number" step="0.01" min="0.01" inputmode="decimal"></label><button class="c" id="gCorto">▼ CORTO</button></div>
+  <div id="gOp"><button class="l" id="gLargo">▲ LARGO</button><label><span id="gLoteT">LOTE</span><input id="gLote" type="number" step="0.01" min="0.01" inputmode="decimal"></label><button class="c" id="gCorto">▼ CORTO</button></div>
+  <div id="gIG"></div>
   <p id="gNota"></p>
 </div>
 <div id="posF">
@@ -1450,9 +1484,13 @@ async function pintaPosiciones(){
 // al último precio guardado y con la hora de ahora (pulsar dos veces para no apuntar sin querer)
 const loteDef = () => store("bolsa_lote") || 0.01;
 $("gLote").value = loteDef();
-$("gLote").onchange = () => { const v = +String($("gLote").value).replace(",", "."); if (v > 0){ store("bolsa_lote", v); toast("Lote guardado: " + String(v).replace(".", ","), 2000); } else $("gLote").value = loteDef(); };
+$("gLote").onchange = () => { const v = +String($("gLote").value).replace(",", ".");
+  if (v > 0 && typeof igListo === "function" && igListo() && IG.epicAct){ const t = store("bolsa_ig_tam") || {}; t[IG.epicAct] = v; store("bolsa_ig_tam", t); toast("Tamaño IG guardado: " + String(v).replace(".", ","), 2000); return; }
+  if (v > 0){ store("bolsa_lote", v); toast("Lote guardado: " + String(v).replace(".", ","), 2000); } else $("gLote").value = loteDef(); };
 function rapida(dir, b){
   if (!G || !simGraf || G.ultimo == null){ toast("Espera a que carguen las velas", 2500); return; }
+  if (igListo() && !b.dataset.seguro){ /* primera pulsación: igual que siempre, pide otra */ }
+  else if (igListo()){ delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? "▲ LARGO" : "▼ CORTO"; igOperar(dir); return; }
   if (!b.dataset.seguro){
     document.querySelectorAll("#gOp button").forEach(x => { delete x.dataset.seguro; x.classList.remove("seg2"); x.textContent = x.id === "gLargo" ? "▲ LARGO" : "▼ CORTO"; });
     b.dataset.seguro = 1; b.classList.add("seg2"); b.textContent = "¿" + (dir === "L" ? "LARGO" : "CORTO") + "? Otra vez";
@@ -2080,9 +2118,250 @@ $("install").onclick = async () => {
 };
 $("year").textContent = new Date().getFullYear();
 
+// ---------- IG: cuenta, precio en vivo y operar de verdad ----------
+// Los datos de acceso se guardan solo en este móvil (localStorage). La app habla directamente con la API de IG.
+const IG = {cfg: store("bolsa_ig"), tok: null, cuenta: null, epics: store("bolsa_ig_epics") || {}, mer: {}, cambio: {}, simAct: null, epicAct: null, pos: [], pidiendo: false};
+const igListo = () => !!(IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key && IG.cuenta);
+const igBase = () => IG.cfg && IG.cfg.real ? "https://api.ig.com/gateway/deal" : "https://demo-api.ig.com/gateway/deal";
+const igModo = () => IG.cfg && IG.cfg.real ? "REAL" : "DEMO";
+const igCab = v => ({"Content-Type": "application/json; charset=UTF-8", "Accept": "application/json; charset=UTF-8", "X-IG-API-KEY": IG.cfg.key, "Version": v});
+const igErr = c => ({
+  "error.security.invalid-details": "usuario o contraseña incorrectos",
+  "error.security.api-key-invalid": "la clave API no es válida (¿es de la cuenta " + igModo() + "?)",
+  "error.security.api-key-disabled": "la clave API está desactivada en IG",
+  "error.public-api.exceeded-api-key-allowance": "demasiadas peticiones a IG: espera un minuto",
+  "error.public-api.exceeded-account-allowance": "demasiadas peticiones a IG: espera un minuto",
+  "INSUFFICIENT_FUNDS": "no hay dinero suficiente en la cuenta",
+  "MARKET_CLOSED_WITH_EDITS": "el mercado está cerrado", "MARKET_CLOSED": "el mercado está cerrado",
+  "MINIMUM_ORDER_SIZE_ERROR": "el tamaño es menor que el mínimo de IG",
+  "ATTACHED_ORDER_LEVEL_ERROR": "stop loss o take profit demasiado cerca del precio"
+}[c] || c);
+async function igLogin(){
+  const r = await fetch(igBase() + "/session", {method: "POST", headers: igCab("3"), body: JSON.stringify({identifier: IG.cfg.usr, password: IG.cfg.pwd})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.oauthToken) throw new Error(igErr(j.errorCode || "HTTP " + r.status));
+  IG.tok = {acc: j.oauthToken.access_token, ref: j.oauthToken.refresh_token, hasta: Date.now() + ((+j.oauthToken.expires_in || 60) - 10) * 1000, cuenta: j.accountId};
+}
+async function igRefresca(){
+  const r = await fetch(igBase() + "/session/refresh-token", {method: "POST", headers: igCab("1"), body: JSON.stringify({refresh_token: IG.tok.ref})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw new Error("refresco");
+  IG.tok = {...IG.tok, acc: j.access_token, ref: j.refresh_token || IG.tok.ref, hasta: Date.now() + ((+j.expires_in || 60) - 10) * 1000};
+}
+async function ig(ruta, o = {}){
+  if (!IG.tok) await igLogin();
+  else if (Date.now() > IG.tok.hasta){ try{ await igRefresca(); }catch(e){ await igLogin(); } }
+  const h = {...igCab(o.version || "1"), "Authorization": "Bearer " + IG.tok.acc, "IG-ACCOUNT-ID": IG.tok.cuenta};
+  if (o.borrar) h["_method"] = "DELETE";
+  const r = await fetch(igBase() + ruta, {method: o.borrar ? "POST" : (o.metodo || "GET"), headers: h, body: o.cuerpo ? JSON.stringify(o.cuerpo) : undefined});
+  if (r.status === 401 && !o.otra){ IG.tok = null; return ig(ruta, {...o, otra: true}); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(igErr(j.errorCode || "HTTP " + r.status));
+  return j;
+}
+const igNum = x => x == null ? NaN : +String(x).replace(",", ".");
+async function igConectar(){
+  IG.tok = null; IG.cuenta = null;
+  const j = await ig("/accounts");
+  const c = (j.accounts || []).find(a => a.accountId === IG.tok.cuenta) || (j.accounts || [])[0];
+  if (!c) throw new Error("no se encuentra la cuenta");
+  IG.cuenta = c; IG.cambio = {};
+  pintaIGEst(); igPintaPos();
+}
+function pintaIGEst(t){
+  const el = $("igEst");
+  if (t){ el.innerHTML = t; return; }
+  if (!igListo()){ el.innerHTML = IG.cfg && IG.cfg.usr ? "Sin conectar. Pulsa Conectar." : "Sin conectar. Rellena tus datos y pulsa Conectar."; $("bIG").innerHTML = '<span class="e">🏦</span>IG'; return; }
+  const b = IG.cuenta.balance || {}, m = IG.cuenta.currency || "EUR";
+  const f = v => (+v || 0).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " " + m;
+  el.innerHTML = `✅ Conectado a IG <b style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">${igModo()}</b> · cuenta ${esc(IG.cuenta.accountId)}<br>Saldo: <b>${f(b.balance)}</b> · Disponible: ${f(b.available)}<br>Resultado abierto: <b class="${(+b.profitLoss || 0) >= 0 ? "g" : "p"}">${f(b.profitLoss)}</b>`;
+  $("bIG").innerHTML = '<span class="e">🏦</span>IG ' + igModo();
+}
+// Mercado de IG (epic) para cada mercado de la app
+const IG_BUSCA = {XAUUSD: "Gold", XAGUSD: "Silver", XPTUSD: "Platinum", XPDUSD: "Palladium", USOIL: "Oil - US Crude", BTCUSD: "Bitcoin", ETHUSD: "Ether"};
+async function igDetalle(epic){
+  if (IG.mer[epic] && Date.now() - IG.mer[epic].t < 3600e3) return IG.mer[epic];
+  const j = await ig("/markets/" + encodeURIComponent(epic), {version: "3"});
+  const ins = j.instrument || {}, dr = j.dealingRules || {}, cur = (ins.currencies || []).find(c => c.isDefault) || (ins.currencies || [])[0] || {};
+  const d = {t: Date.now(), epic, nombre: ins.name, vPip: igNum(ins.valueOfOnePip) || 1, cur: cur.code || "EUR",
+    min: igNum(dr.minDealSize && dr.minDealSize.value) || 1, minDist: dr.minNormalStopOrLimitDistance && dr.minNormalStopOrLimitDistance.unit === "POINTS" ? igNum(dr.minNormalStopOrLimitDistance.value) : 0,
+    esc: igNum(j.snapshot && j.snapshot.scalingFactor) || 1, snap: j.snapshot || {}};
+  IG.mer[epic] = d; return d;
+}
+async function igEpic(sim){
+  if (IG.epics[sim]) return IG.epics[sim];
+  let epic = null;
+  if (/^[A-Z]{6}$/.test(sim) && !IG_BUSCA[sim]){
+    for (const e of ["CS.D." + sim + ".MINI.IP", "CS.D." + sim + ".CFD.IP"]){
+      try{ await igDetalle(e); epic = e; break; }catch(err){}
+    }
+  }
+  if (!epic){
+    const q = IG_BUSCA[sim] || (/^[A-Z]{6}$/.test(sim) ? sim.slice(0, 3) + "/" + sim.slice(3) : merDe(sim)[1].replace(/\(.*?\)/g, "").trim());
+    const j = await ig("/markets?searchTerm=" + encodeURIComponent(q));
+    const l = (j.markets || []).filter(m => m.expiry === "-" && !/BINARY|OPT_|SPRINT/.test(m.instrumentType || ""));
+    const m = l.find(m => /mini/i.test(m.instrumentName)) || l[0];
+    if (!m) throw new Error("no encuentro " + merDe(sim)[1] + " en IG");
+    epic = m.epic;
+  }
+  IG.epics[sim] = epic; store("bolsa_ig_epics", IG.epics);
+  return epic;
+}
+// Cuántas unidades de la moneda del mercado vale 1 euro (para pasar los € del stop a puntos)
+async function igEurA(cur){
+  const base = (IG.cuenta && IG.cuenta.currency) || "EUR";
+  if (cur === base) return 1;
+  if (IG.cambio[cur] && Date.now() - IG.cambio[cur].t < 600e3) return IG.cambio[cur].v;
+  const e = await igEpic(base + cur), d = await igDetalle(e);
+  const s = await ig("/markets/" + encodeURIComponent(e), {version: "3"});
+  const v = ((igNum(s.snapshot.bid) + igNum(s.snapshot.offer)) / 2) / d.esc;
+  if (!(v > 0)) throw new Error("sin cambio " + base + "/" + cur);
+  IG.cambio[cur] = {v, t: Date.now()}; return v;
+}
+const igTam = epic => (store("bolsa_ig_tam") || {})[epic];
+async function igOperar(dir){
+  if (IG.pidiendo) return;
+  const sim = simGraf; IG.pidiendo = true;
+  try{
+    toast("Enviando a IG " + igModo() + "…", 8000);
+    const epic = await igEpic(sim), d = await igDetalle(epic);
+    let tam = igNum($("gLote").value); if (!(tam > 0)) tam = igTam(epic) || d.min;
+    if (tam < d.min){ toast("El mínimo en IG para este mercado es " + String(d.min).replace(".", ",") + ". Cambia el tamaño.", 5000); return; }
+    const t = store("bolsa_ig_tam") || {}; t[epic] = tam; store("bolsa_ig_tam", t);
+    const eurPunto = tam * d.vPip / await igEurA(d.cur);   // € que se ganan o pierden por cada punto
+    const sl = IG.cfg.sl || 8, tp = IG.cfg.tp || 8;
+    let dSL = Math.round(sl / eurPunto * 10) / 10, dTP = Math.round(tp / eurPunto * 10) / 10, aviso = "";
+    if (d.minDist && dSL < d.minDist){ dSL = d.minDist; aviso = " (stop ampliado al mínimo de IG)"; }
+    if (d.minDist && dTP < d.minDist){ dTP = d.minDist; aviso = " (take profit ampliado al mínimo de IG)"; }
+    const r = await ig("/positions/otc", {metodo: "POST", version: "2", cuerpo: {epic, expiry: "-", direction: dir === "L" ? "BUY" : "SELL", size: tam, orderType: "MARKET", currencyCode: d.cur, forceOpen: true, guaranteedStop: false, stopDistance: dSL, limitDistance: dTP}});
+    let c = null;
+    for (let i = 0; i < 4 && !c; i++){ try{ c = await ig("/confirms/" + r.dealReference); }catch(e){ await new Promise(ok => setTimeout(ok, 700)); } }
+    if (!c) throw new Error("IG no confirma la orden: mira tus posiciones");
+    if (c.dealStatus !== "ACCEPTED") throw new Error(igErr(c.reason));
+    if (navigator.vibrate) try{ navigator.vibrate([60, 60, 60]); }catch(e){}
+    toast(`✅ IG ${igModo()}: ${dir === "L" ? "▲ LARGO" : "▼ CORTO"} ${merDe(sim)[1]} · tamaño ${String(tam).replace(".", ",")} a ${igNum(c.level)} · SL −${(dSL * eurPunto).toFixed(2).replace(".", ",")} € · TP +${(dTP * eurPunto).toFixed(2).replace(".", ",")} €${aviso}`, 7000);
+    await igPintaPos();
+  }catch(e){ toast("❌ IG: " + e.message, 6000); }
+  finally{ IG.pidiendo = false; }
+}
+async function igCerrar(p){
+  const r = await ig("/positions/otc", {borrar: true, version: "1", cuerpo: {dealId: p.position.dealId, direction: p.position.direction === "BUY" ? "SELL" : "BUY", size: igNum(p.position.size), orderType: "MARKET"}});
+  let c = null;
+  for (let i = 0; i < 4 && !c; i++){ try{ c = await ig("/confirms/" + r.dealReference); }catch(e){ await new Promise(ok => setTimeout(ok, 700)); } }
+  if (c && c.dealStatus !== "ACCEPTED") throw new Error(igErr(c.reason));
+  const g = c && c.profit != null ? " · " + (c.profit >= 0 ? "+" : "−") + Math.abs(c.profit).toFixed(2).replace(".", ",") + " " + (c.profitCurrency || "€") : "";
+  toast("🔒 IG: cerrada " + (p.market.instrumentName || "") + g, 5000);
+}
+// Ganancia o pérdida de una posición de IG en la moneda de la cuenta
+async function igPL(p){
+  const d = await igDetalle(p.market.epic), x = p.position, m = p.market;
+  const pts = x.direction === "BUY" ? igNum(m.bid) - igNum(x.level) : igNum(x.level) - igNum(m.offer);
+  return pts * igNum(x.size) * d.vPip / await igEurA(d.cur);
+}
+const igFila = (p, pl) => {
+  const x = p.position, c = pl == null ? "" : pl >= 0 ? "g" : "p";
+  return `<div class="igp" data-id="${esc(x.dealId)}"><div class="t">${x.direction === "BUY" ? "▲" : "▼"} ${esc(p.market.instrumentName || p.market.epic)} <b class="${c}">${pl == null ? "" : (pl >= 0 ? "+" : "−") + Math.abs(pl).toFixed(2).replace(".", ",") + " €"}</b><small>Tamaño ${String(x.size).replace(".", ",")} · entrada ${x.level}${x.stopLevel ? " · SL " + x.stopLevel : ""}${x.limitLevel ? " · TP " + x.limitLevel : ""}</small></div><button>CERRAR</button></div>`;
+};
+function igBotonesCerrar(caja){
+  caja.querySelectorAll(".igp button").forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    const p = IG.pos.find(x => x.position.dealId === b.closest(".igp").dataset.id); if (!p) return;
+    if (!b.dataset.seguro){ b.dataset.seguro = 1; b.textContent = "¿SEGURO?"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "CERRAR"; } }, 4000); return; }
+    b.disabled = true; b.textContent = "…";
+    try{ await igCerrar(p); }catch(err){ toast("❌ IG: " + err.message, 6000); }
+    igPintaPos();
+  });
+}
+async function igPintaPos(){
+  if (!igListo()) return;
+  try{
+    const j = await ig("/positions", {version: "2"});
+    IG.pos = j.positions || [];
+    const pls = await Promise.all(IG.pos.map(p => igPL(p).catch(() => null)));
+    $("igPos").innerHTML = IG.pos.length ? IG.pos.map((p, i) => igFila(p, pls[i])).join("") : '<p class="sub">No tienes posiciones abiertas en IG.</p>';
+    igBotonesCerrar($("igPos"));
+    try{ const a = await ig("/accounts"); IG.cuenta = (a.accounts || []).find(c => c.accountId === IG.cuenta.accountId) || IG.cuenta; pintaIGEst(); }catch(e){}
+    igPintaGraf(pls);
+  }catch(e){ $("igPos").innerHTML = '<p class="sub">No se pudieron leer: ' + esc(e.message) + "</p>"; }
+}
+// En el gráfico: precio de IG en vivo y tus posiciones de IG de ese mercado
+function igPintaGraf(pls){
+  const caja = $("gIG");
+  if (!igListo() || !simGraf || !IG.epicAct){ caja.style.display = "none"; $("gLoteT").textContent = "LOTE"; return; }
+  $("gLoteT").textContent = "IG";
+  const d = IG.mer[IG.epicAct], s = d && d.snap;
+  const l = IG.pos.map((p, i) => [p, pls ? pls[i] : null]).filter(([p]) => p.market.epic === IG.epicAct);
+  caja.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG ${igModo()}</span>${s ? " · " + s.bid + " / " + s.offer : ""} · SL −${IG.cfg.sl || 8} € · TP +${IG.cfg.tp || 8} €` + l.map(([p, pl]) => igFila(p, pl)).join("");
+  caja.style.display = "block";
+  igBotonesCerrar(caja);
+}
+// Cada 3 s con el gráfico abierto: precio de IG, actualiza la última vela; cada 15 s, las posiciones
+let igTick = 0;
+setInterval(async () => {
+  if (!igListo() || !G || !simGraf || !$("graf").classList.contains("on") || document.visibilityState !== "visible"){ if (!$("graf").classList.contains("on")) IG.simAct = null; return; }
+  try{
+    if (IG.simAct !== simGraf){
+      IG.simAct = simGraf; IG.epicAct = null; $("gIG").style.display = "none";
+      IG.epicAct = await igEpic(simGraf);
+      const d = await igDetalle(IG.epicAct);
+      $("gLote").value = igTam(IG.epicAct) || d.min;
+      igTick = 0;
+    }
+    const epic = IG.epicAct, d = IG.mer[epic];
+    const j = await ig("/markets/" + encodeURIComponent(epic), {version: "3"});
+    if (IG.epicAct !== epic || !G) return;
+    d.snap = j.snapshot || {};
+    const pr = ((igNum(d.snap.bid) + igNum(d.snap.offer)) / 2) / d.esc;
+    if (pr > 0 && G.serie && G.serie.data){
+      const dat = G.serie.data(), u = dat[dat.length - 1];
+      if (u && u.open != null){
+        const ahora = Math.floor(Date.now() / 1000), fin = u.time + G.dur;
+        if (ahora >= fin && ahora - fin < G.dur * 3){ const t = u.time + G.dur * Math.floor((ahora - u.time) / G.dur); G.serie.update({time: t, open: pr, high: pr, low: pr, close: pr}); }
+        else if (ahora < fin) G.serie.update({...u, high: Math.max(u.high, pr), low: Math.min(u.low, pr), close: pr});
+      }
+      G.ultimo = pr;
+    }
+    if (igTick++ % 5 === 0) await igPintaPos(); else igPintaGraf();
+  }catch(e){ $("gIG").style.display = "block"; $("gIG").textContent = "IG: " + e.message; }
+}, 3000);
+// Pantalla IG
+function igCargaForm(){
+  const c = IG.cfg || {};
+  $("igUsr").value = c.usr || ""; $("igPwd").value = c.pwd || ""; $("igKey").value = c.key || "";
+  $("igSL").value = c.sl || 8; $("igTP").value = c.tp || 8;
+  $("igDemo").classList.toggle("on", !c.real); $("igReal").classList.toggle("on", !!c.real);
+}
+$("bIG").onclick = () => { igCargaForm(); pintaIGEst(); ir("pIG"); if (igListo()) igPintaPos(); };
+$("igDemo").onclick = () => { $("igDemo").classList.add("on"); $("igReal").classList.remove("on"); };
+$("igReal").onclick = () => {
+  const b = $("igReal");
+  if (!b.dataset.seguro && !b.classList.contains("on")){ b.dataset.seguro = 1; b.textContent = "¿REAL? Otra vez"; setTimeout(() => { delete b.dataset.seguro; b.textContent = "REAL"; }, 4000); return; }
+  delete b.dataset.seguro; b.textContent = "REAL"; b.classList.add("on"); $("igDemo").classList.remove("on");
+};
+$("igCon").onclick = async () => {
+  const cfg = {usr: $("igUsr").value.trim(), pwd: $("igPwd").value, key: $("igKey").value.trim(), real: $("igReal").classList.contains("on"),
+    sl: igNum($("igSL").value) > 0 ? igNum($("igSL").value) : 8, tp: igNum($("igTP").value) > 0 ? igNum($("igTP").value) : 8};
+  if (!cfg.usr || !cfg.pwd || !cfg.key){ toast("Rellena usuario, contraseña y clave API", 3000); return; }
+  if ((IG.cfg && !!IG.cfg.real) !== cfg.real){ IG.epics = {}; store("bolsa_ig_epics", {}); }
+  IG.cfg = cfg; store("bolsa_ig", cfg); IG.simAct = null; IG.mer = {};
+  pintaIGEst("Conectando con IG " + igModo() + "…");
+  try{ await igConectar(); toast("✅ Conectado a IG " + igModo(), 3000); }
+  catch(e){ IG.cuenta = null; pintaIGEst("❌ No se pudo conectar: " + esc(/fetch/i.test(e.message) ? "no hay respuesta de IG (revisa la conexión a internet)" : e.message)); }
+};
+$("igAct").onclick = () => igListo() ? igPintaPos() : $("igCon").onclick();
+$("igSalir").onclick = () => {
+  const b = $("igSalir");
+  if (!b.dataset.seguro){ b.dataset.seguro = 1; b.textContent = "¿Seguro? Pulsa otra vez"; setTimeout(() => { delete b.dataset.seguro; b.textContent = "Desconectar y borrar datos de IG"; }, 4000); return; }
+  IG.cfg = null; IG.tok = null; IG.cuenta = null; IG.pos = []; IG.epics = {}; store("bolsa_ig", null); store("bolsa_ig_epics", {});
+  igCargaForm(); pintaIGEst(); $("igPos").innerHTML = '<p class="sub">—</p>'; b.textContent = "Desconectar y borrar datos de IG"; delete b.dataset.seguro;
+  toast("Datos de IG borrados de este móvil", 3000);
+};
+// Al abrir la app, si ya había datos de IG, se conecta sola
+if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {});
+
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.09-5";
+const APP_VERSION = "2026.11.10-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
