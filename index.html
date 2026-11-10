@@ -165,6 +165,11 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 #gPL .pl .v{flex:1;line-height:1.2;white-space:nowrap}#gPL .pl .v small{font:500 10px Archivo,sans-serif;color:var(--mut);margin-left:4px}
 #gPL .g{color:var(--verde)}#gPL .p{color:var(--rojo)}
 #gPL .pl button{font:900 10px Archivo,sans-serif;padding:3px 5px;border-radius:5px;border:0;background:var(--oro);color:#0E1A14;cursor:pointer;white-space:nowrap}
+#gTk{display:none;margin-top:6px;padding:8px 10px;border:1px solid var(--oro);border-radius:12px;background:var(--panel2);font:700 13px Archivo,sans-serif}
+#gTk .fil{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}#gTk .fil b{font-family:"JetBrains Mono",monospace}
+#gTk .bt{display:flex;gap:8px;margin-top:8px}#gTk .bt button{flex:1;padding:10px;border:0;border-radius:10px;font:900 14px Archivo,sans-serif;cursor:pointer}
+#gTk .ok.l{background:var(--verde);color:#0E1A14}#gTk .ok.c{background:var(--rojo);color:#fff}#gTk .no{background:var(--panel);color:var(--txt);border:1px solid var(--line)!important}
+#gTk small{display:block;color:var(--mut);font-weight:500;margin-top:4px}
 #gOp{display:flex;gap:5px;margin-top:5px;align-items:stretch}
 #gOp button{flex:1;padding:5px 0;border-radius:8px;border:0;font:900 12px Archivo,sans-serif;cursor:pointer}
 #gOp .l{background:var(--verde);color:#0E1A14}#gOp .c{background:var(--rojo);color:#fff}
@@ -269,8 +274,8 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <label>Contraseña de IG</label><input id="igPwd" type="password" autocomplete="current-password">
   <label>Clave API (My IG → Configuración → Claves API)</label><input id="igKey" autocapitalize="off" autocomplete="off">
   <div class="dos">
-    <div><label>Stop loss (€)</label><input id="igSL" type="number" step="0.5" min="1" inputmode="decimal"></div>
-    <div><label>Take profit (€)</label><input id="igTP" type="number" step="0.5" min="1" inputmode="decimal"></div>
+    <div><label>SL inicial de las líneas (€)</label><input id="igSL" type="number" step="0.5" min="1" inputmode="decimal"></div>
+    <div><label>TP inicial de las líneas (€)</label><input id="igTP" type="number" step="0.5" min="1" inputmode="decimal"></div>
   </div>
   <button class="btn" id="igCon">Conectar</button>
   <h3 style="margin-top:22px">Posiciones abiertas en IG</h3>
@@ -408,6 +413,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <div id="gTfs"></div>
   <div id="gCaja"><div id="gPL"></div><div id="gLinea"><span id="gEtq"></span><div id="gSig"></div></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
   <div id="gOp"><button class="l" id="gLargo">▲ LARGO</button><label><span id="gLoteT">LOTE</span><input id="gLote" type="number" step="0.01" min="0.01" inputmode="decimal"></label><button class="c" id="gCorto">▼ CORTO</button></div>
+  <div id="gTk"></div>
   <div id="gIG"></div>
   <p id="gNota"></p>
 </div>
@@ -1514,8 +1520,7 @@ $("gLote").onchange = () => { const v = +String($("gLote").value).replace(",", "
   if (v > 0){ store("bolsa_lote", v); toast("Lote guardado: " + String(v).replace(".", ","), 2000); } else $("gLote").value = loteDef(); };
 function rapida(dir, b){
   if (!G || !simGraf || G.ultimo == null){ toast("Espera a que carguen las velas", 2500); return; }
-  if (grafIG && igListo() && !b.dataset.seguro){ /* primera pulsación: igual que siempre, pide otra */ }
-  else if (grafIG && igListo()){ delete b.dataset.seguro; b.classList.remove("seg2"); b.textContent = dir === "L" ? tL() : tC(); igOperar(dir); return; }
+  if (grafIG && igListo()){ igTicket(dir); return; }
   if (!b.dataset.seguro){
     document.querySelectorAll("#gOp button").forEach(x => { delete x.dataset.seguro; x.classList.remove("seg2"); x.textContent = x.id === "gLargo" ? tL() : tC(); });
     b.dataset.seguro = 1; b.classList.add("seg2"); b.textContent = "¿" + (dir === "L" ? tL() : tC()).slice(2) + "? Otra vez";
@@ -2218,7 +2223,9 @@ async function igDetalle(epic){
   const ins = j.instrument || {}, dr = j.dealingRules || {}, cur = (ins.currencies || []).find(c => c.isDefault) || (ins.currencies || [])[0] || {};
   const d = {t: Date.now(), epic, nombre: ins.name, vPip: igNum(ins.valueOfOnePip) || 1, cur: cur.code || "EUR",
     min: igNum(dr.minDealSize && dr.minDealSize.value) || 1, minDist: dr.minNormalStopOrLimitDistance && dr.minNormalStopOrLimitDistance.unit === "POINTS" ? igNum(dr.minNormalStopOrLimitDistance.value) : 0,
-    esc: igNum(j.snapshot && j.snapshot.scalingFactor) || 1, snap: j.snapshot || {}};
+    esc: igNum(j.snapshot && j.snapshot.scalingFactor) || 1, snap: j.snapshot || {},
+    pip: igNum(String(ins.onePipMeans || "").split(" ")[0]) || 0,
+    mf: ins.marginFactor != null && ins.marginFactorUnit !== "POINTS" ? igNum(ins.marginFactor) : igNum(((ins.marginDepositBands || [])[0] || {}).margin) || 0};
   IG.mer[epic] = d; return d;
 }
 async function igEpic(sim){
@@ -2256,29 +2263,101 @@ async function igEurA(cur){
   IG.cambio[cur] = {v, t: Date.now()}; return v;
 }
 const igTam = epic => (store("bolsa_ig_tam") || {})[epic];
-async function igOperar(dir){
+// Puntos de IG entre dos precios de IG (IG da unos mercados en decimales, 1.16123, y otros en puntos, 11612.3)
+const igFac = (raw, d) => d.pip > 0 && raw / d.pip >= 1e6 ? 1 / d.pip : 1;          // precio de IG / precio real
+const igPts = (dif, raw, d) => d.pip > 0 ? dif / igFac(raw, d) / d.pip : dif;
+// ---------- Ficha de la orden: margen, y SL/TP con líneas que se arrastran en el gráfico ----------
+let TK = null;
+const fE = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).replace(".", ",") + " €";
+function tkFuera(){
+  if (TK && TK.serie){ try{ TK.serie.removePriceLine(TK.lSL); TK.serie.removePriceLine(TK.lTP); TK.serie.removePriceLine(TK.lEn); }catch(e){} }
+  TK = null; $("gTk").style.display = "none"; $("gTk").innerHTML = "";
+  if (G && G.chart) G.chart.applyOptions({handleScroll: true, handleScale: true});
+}
+function tkLineas(){
+  if (!TK || !G || !G.serie) return;
+  if (TK.serie !== G.serie){
+    TK.serie = G.serie;
+    TK.lEn = G.serie.createPriceLine({price: TK.ent, color: "#F5C451", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: TK.dir === "L" ? "▲ ENTRADA" : "▼ ENTRADA"});
+    TK.lSL = G.serie.createPriceLine({price: TK.sl, color: "#E5484D", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "SL"});
+    TK.lTP = G.serie.createPriceLine({price: TK.tp, color: "#2FBF71", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "TP"});
+  }
+  const largo = TK.dir === "L";
+  const eSL = -Math.abs(TK.ent - TK.sl) / TK.d.pip * TK.eurPunto, eTP = Math.abs(TK.tp - TK.ent) / TK.d.pip * TK.eurPunto;
+  TK.lSL.applyOptions({price: TK.sl, title: "SL " + fE(eSL) + " ⇕"}); TK.lTP.applyOptions({price: TK.tp, title: "TP " + fE(eTP) + " ⇕"});
+  const dec = TK.ent < 10 ? 5 : TK.ent < 300 ? 3 : 2, f = v => v.toFixed(dec);
+  $("gTk").innerHTML = `<div class="fil"><span>${largo ? "▲ COMPRAR" : "▼ VENDER"} ${esc(merDe(TK.sim)[1])}</span><span>Tamaño <b>${String(TK.tam).replace(".", ",")}</b></span><span>Entrada ≈ <b>${f(TK.ent)}</b></span>
+    <span>💰 Margen: <b>${TK.margen > 0 ? TK.margen.toFixed(2).replace(".", ",") + " €" : "—"}</b></span></div>
+    <div class="fil"><span style="color:var(--rojo)">SL <b>${f(TK.sl)}</b> (${fE(eSL)})</span><span style="color:var(--verde)">TP <b>${f(TK.tp)}</b> (${fE(eTP)})</span></div>
+    <small>Arrastra en el gráfico la línea roja (stop loss) o la verde (take profit) para moverlas. Disponible en la cuenta: ${(+((IG.cuenta && IG.cuenta.balance && IG.cuenta.balance.available) || 0)).toFixed(2).replace(".", ",")} €</small>
+    <div class="bt"><button class="no" id="tkNo">Cancelar</button><button class="ok ${largo ? "l" : "c"}" id="tkOk">✅ CONFIRMAR ${largo ? "COMPRA" : "VENTA"}</button></div>`;
+  $("tkNo").onclick = tkFuera; $("tkOk").onclick = tkEnviar;
+  $("gTk").style.display = "block";
+}
+async function igTicket(dir){
   if (IG.pidiendo) return;
-  const sim = simGraf; IG.pidiendo = true;
+  tkFuera();
+  const sim = simGraf;
   try{
-    toast("Enviando a IG " + igModo() + "…", 8000);
+    toast("Calculando con IG…", 3000);
     const epic = await igEpic(sim), d = await igDetalle(epic);
+    if (!(d.pip > 0)) throw new Error("IG no da el tamaño del punto de este mercado");
     let tam = igNum($("gLote").value); if (!(tam > 0)) tam = igTam(epic) || d.min;
     if (tam < d.min){ toast("El mínimo en IG para este mercado es " + String(d.min).replace(".", ",") + ". Cambia el tamaño.", 5000); return; }
     const t = store("bolsa_ig_tam") || {}; t[epic] = tam; store("bolsa_ig_tam", t);
-    const eurPunto = tam * d.vPip / await igEurA(d.cur);   // € que se ganan o pierden por cada punto
-    const sl = IG.cfg.sl || 8, tp = IG.cfg.tp || 8;
-    let dSL = Math.round(sl / eurPunto * 10) / 10, dTP = Math.round(tp / eurPunto * 10) / 10, aviso = "";
-    if (d.minDist && dSL < d.minDist){ dSL = d.minDist; aviso = " (stop ampliado al mínimo de IG)"; }
-    if (d.minDist && dTP < d.minDist){ dTP = d.minDist; aviso = " (take profit ampliado al mínimo de IG)"; }
-    const r = await ig("/positions/otc", {metodo: "POST", version: "2", cuerpo: {epic, expiry: "-", direction: dir === "L" ? "BUY" : "SELL", size: tam, orderType: "MARKET", currencyCode: d.cur, forceOpen: true, guaranteedStop: false, stopDistance: dSL, limitDistance: dTP}});
+    const j = await ig("/markets/" + encodeURIComponent(epic), {version: "3"}), sn = j.snapshot || {};
+    const raw = igNum(dir === "L" ? sn.offer : sn.bid); if (!(raw > 0)) throw new Error("el mercado está cerrado en IG");
+    const ent = raw / igFac(raw, d), eurA = await igEurA(d.cur), eurPunto = tam * d.vPip / eurA;
+    const u = G && G.serie ? G.serie.data().slice(-1)[0] : null;
+    if (u && u.close > 0 && Math.abs(ent / u.close - 1) > 0.03) throw new Error("el precio de IG (" + ent + ") no cuadra con el gráfico");
+    const margen = ent / d.pip * d.vPip * tam * d.mf / 100 / eurA;
+    const minP = Math.max(d.minDist || 0, 1);
+    const dSL = Math.max((IG.cfg.sl || 8) / eurPunto, minP) * d.pip, dTP = Math.max((IG.cfg.tp || 8) / eurPunto, minP) * d.pip;
+    TK = {dir, sim, epic, d, tam, ent, eurPunto, margen, minP, sl: dir === "L" ? ent - dSL : ent + dSL, tp: dir === "L" ? ent + dTP : ent - dTP, serie: null};
+    tkLineas();
+  }catch(e){ tkFuera(); toast("❌ IG: " + e.message, 6000); }
+}
+// Arrastrar las líneas SL / TP
+(() => {
+  const caja = $("gCaja"); let arr = null;
+  const yDe = e => e.clientY - caja.getBoundingClientRect().top;
+  caja.addEventListener("pointerdown", e => {
+    if (!TK || !G || TK.serie !== G.serie) return;
+    const y = yDe(e), ySL = G.serie.priceToCoordinate(TK.sl), yTP = G.serie.priceToCoordinate(TK.tp);
+    const dSL = ySL == null ? 1e9 : Math.abs(y - ySL), dTP = yTP == null ? 1e9 : Math.abs(y - yTP);
+    if (Math.min(dSL, dTP) > 18) return;
+    arr = dSL <= dTP ? "sl" : "tp";
+    G.chart.applyOptions({handleScroll: false, handleScale: false});
+    try{ caja.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault(); e.stopPropagation();
+  }, true);
+  caja.addEventListener("pointermove", e => {
+    if (!arr || !TK || !G) return;
+    const p = G.serie.coordinateToPrice(yDe(e)); if (p == null) return;
+    const lim = TK.minP * TK.d.pip, L = TK.dir === "L";
+    if (arr === "sl") TK.sl = L ? Math.min(p, TK.ent - lim) : Math.max(p, TK.ent + lim);
+    else TK.tp = L ? Math.max(p, TK.ent + lim) : Math.min(p, TK.ent - lim);
+    tkLineas(); e.preventDefault(); e.stopPropagation();
+  }, true);
+  const suelta = () => { if (arr){ arr = null; if (G && G.chart) G.chart.applyOptions({handleScroll: true, handleScale: true}); } };
+  caja.addEventListener("pointerup", suelta, true); caja.addEventListener("pointercancel", suelta, true);
+})();
+$("gLote").addEventListener("change", () => { if (!TK) return; const v = igNum($("gLote").value); if (v >= TK.d.min){ TK.eurPunto *= v / TK.tam; TK.margen *= v / TK.tam; TK.tam = v; tkLineas(); } });
+async function tkEnviar(){
+  if (!TK || IG.pidiendo) return;
+  const k = TK; IG.pidiendo = true; $("tkOk").disabled = true; $("tkOk").textContent = "Enviando…";
+  try{
+    const dSL = Math.round(Math.abs(k.ent - k.sl) / k.d.pip * 10) / 10, dTP = Math.round(Math.abs(k.tp - k.ent) / k.d.pip * 10) / 10;
+    const r = await ig("/positions/otc", {metodo: "POST", version: "2", cuerpo: {epic: k.epic, expiry: "-", direction: k.dir === "L" ? "BUY" : "SELL", size: k.tam, orderType: "MARKET", currencyCode: k.d.cur, forceOpen: true, guaranteedStop: false, stopDistance: dSL, limitDistance: dTP}});
     let c = null;
     for (let i = 0; i < 4 && !c; i++){ try{ c = await ig("/confirms/" + r.dealReference); }catch(e){ await new Promise(ok => setTimeout(ok, 700)); } }
     if (!c) throw new Error("IG no confirma la orden: mira tus posiciones");
     if (c.dealStatus !== "ACCEPTED") throw new Error(igErr(c.reason));
     if (navigator.vibrate) try{ navigator.vibrate([60, 60, 60]); }catch(e){}
-    toast(`✅ IG ${igModo()}: ${dir === "L" ? tL() : tC()} ${merDe(sim)[1]} · tamaño ${String(tam).replace(".", ",")} a ${igNum(c.level)} · SL −${(dSL * eurPunto).toFixed(2).replace(".", ",")} € · TP +${(dTP * eurPunto).toFixed(2).replace(".", ",")} €${aviso}`, 7000);
+    tkFuera();
+    toast(`✅ IG ${igModo()}: ${k.dir === "L" ? "▲ COMPRA" : "▼ VENTA"} ${merDe(k.sim)[1]} · tamaño ${String(k.tam).replace(".", ",")} a ${igNum(c.level)} · SL ${fE(-dSL * k.eurPunto)} · TP ${fE(dTP * k.eurPunto)}`, 7000);
     await igPintaPos();
-  }catch(e){ toast("❌ IG: " + e.message, 6000); }
+  }catch(e){ toast("❌ IG: " + e.message, 6000); if ($("tkOk")){ $("tkOk").disabled = false; $("tkOk").textContent = "✅ CONFIRMAR " + (k.dir === "L" ? "COMPRA" : "VENTA"); } }
   finally{ IG.pidiendo = false; }
 }
 async function igCerrar(p){
@@ -2292,8 +2371,8 @@ async function igCerrar(p){
 // Ganancia o pérdida de una posición de IG en la moneda de la cuenta
 async function igPL(p){
   const d = await igDetalle(p.market.epic), x = p.position, m = p.market;
-  const pts = x.direction === "BUY" ? igNum(m.bid) - igNum(x.level) : igNum(x.level) - igNum(m.offer);
-  return pts * igNum(x.size) * d.vPip / await igEurA(d.cur);
+  const dif = x.direction === "BUY" ? igNum(m.bid) - igNum(x.level) : igNum(x.level) - igNum(m.offer);
+  return igPts(dif, igNum(x.level), d) * igNum(x.size) * d.vPip / await igEurA(d.cur);
 }
 const igFila = (p, pl) => {
   const x = p.position, c = pl == null ? "" : pl >= 0 ? "g" : "p";
@@ -2328,17 +2407,17 @@ function igPintaGraf(pls){
   $("gLoteT").textContent = "IG";
   const d = IG.mer[IG.epicAct], s = d && d.snap;
   const l = IG.pos.map((p, i) => [p, pls ? pls[i] : null]).filter(([p]) => p.market.epic === IG.epicAct);
-  caja.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG ${igModo()}</span>${s ? " · " + s.bid + " / " + s.offer : ""} · SL −${IG.cfg.sl || 8} € · TP +${IG.cfg.tp || 8} €${IG.aviso ? ' · <b style="color:var(--rojo)">⚠ ' + IG.aviso + "</b>" : ""}` + l.map(([p, pl]) => igFila(p, pl)).join("");
+  caja.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG ${igModo()}</span>${s ? " · " + s.bid + " / " + s.offer : ""} · precio de IG${IG.aviso ? ' · <b style="color:var(--rojo)">⚠ ' + IG.aviso + "</b>" : ""}` + l.map(([p, pl]) => igFila(p, pl)).join("");
   caja.style.display = "block";
   igBotonesCerrar(caja);
 }
 // Cada 3 s con el gráfico abierto: precio de IG, actualiza la última vela; cada 15 s, las posiciones
 let igTick = 0;
 setInterval(async () => {
-  if (!grafIG || !igListo() || !G || !simGraf || !$("graf").classList.contains("on") || document.visibilityState !== "visible"){ if (!$("graf").classList.contains("on")) IG.simAct = null; return; }
+  if (!grafIG || !igListo() || !G || !simGraf || !$("graf").classList.contains("on") || document.visibilityState !== "visible"){ if (!$("graf").classList.contains("on")){ IG.simAct = null; if (TK) tkFuera(); } return; }
   try{
     if (IG.simAct !== simGraf){
-      IG.simAct = simGraf; IG.epicAct = null; $("gIG").style.display = "none";
+      IG.simAct = simGraf; IG.epicAct = null; $("gIG").style.display = "none"; tkFuera();
       IG.epicAct = await igEpic(simGraf);
       const d = await igDetalle(IG.epicAct);
       $("gLote").value = igTam(IG.epicAct) || d.min;
@@ -2360,6 +2439,7 @@ setInterval(async () => {
       }
       G.ultimo = pr;
     }
+    if (TK && TK.serie !== G.serie) tkLineas();
     if (igTick++ % 5 === 0) await igPintaPos(); else igPintaGraf();
   }catch(e){ $("gIG").style.display = "block"; $("gIG").textContent = "IG: " + e.message; }
 }, 3000);
@@ -2478,7 +2558,7 @@ if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-9";
+const APP_VERSION = "2026.11.10-10";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
