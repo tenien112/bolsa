@@ -263,6 +263,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
     <button class="grande g-pos" id="bPos"><span class="e">📌</span>MIS POSICIONES</button>
     <button class="grande g-buscar" id="bBuscar"><span class="e">🔎</span>BUSCAR VALOR</button>
     <button class="grande g-ig" id="bIG"><span class="e">🏦</span>IG</button>
+    <button class="grande" id="bSalir" style="grid-column:1/-1;background:var(--rojo);color:#fff;padding:14px 8px;flex-direction:row;gap:10px"><span class="e" style="font-size:26px">⏻</span>SALIR</button>
   </div>
   <button class="btn sec" id="install" style="margin-top:20px">📲 Instalar la app</button>
 </section>
@@ -2584,9 +2585,17 @@ $("igSalir").onclick = () => {
 // Al abrir la app, si ya había datos de IG, se conecta sola
 if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {});
 
+// ---------- Salir ----------
+$("bSalir").onclick = () => {
+  const b = $("bSalir");
+  if (!b.dataset.seguro){ b.dataset.seguro = 1; b.lastChild.textContent = "¿SALIR? Pulsa otra vez"; setTimeout(() => { delete b.dataset.seguro; b.lastChild.textContent = "SALIR"; }, 4000); return; }
+  try{ window.close(); }catch(e){}
+  // Si el sistema no deja cerrar la ventana (p. ej. en el móvil), se deja la app en blanco
+  setTimeout(() => { document.body.innerHTML = '<div style="display:flex;height:90vh;align-items:center;justify-content:center;text-align:center;font:700 20px Archivo,sans-serif;color:#9FB3A8">BOLSA-LORENZITO cerrada.<br>Ya puedes quitarla de la pantalla.</div>'; }, 300);
+};
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-13";
+const APP_VERSION = "2026.11.10-14";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
