@@ -29,7 +29,9 @@ header h1 span{color:var(--oro)}
 .pant{display:none}
 .pant.on{display:block;animation:entra .2s ease}
 @keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.grandes{display:grid;gap:16px;margin-top:8px}
+.grandes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+.grandes .grande{flex-direction:column;gap:6px;padding:22px 8px;font-size:clamp(15px,4.6vw,26px);text-align:center;line-height:1.1}
+.grandes .grande .e{font-size:clamp(30px,9vw,44px)}
 .grande{border:0;border-radius:22px;padding:34px 20px;font:900 30px Archivo,sans-serif;letter-spacing:1px;color:#0E1A14;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 6px 0 rgba(0,0,0,.35)}
 .grande:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.35)}
 .grande .e{font-size:40px}
@@ -2463,7 +2465,7 @@ if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-5";
+const APP_VERSION = "2026.11.10-6";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
