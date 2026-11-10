@@ -2240,6 +2240,9 @@ async function igEpic(sim){
   IG.epics[sim] = epic; store("bolsa_ig_epics", IG.epics);
   return epic;
 }
+// IG da los precios en distintas escalas (1.16123 o 11612.3): se elige la potencia de 10 que deja el precio más cerca de una referencia
+const igReal = (mid, ref) => { if (!(mid > 0) || !(ref > 0)) return NaN; let mej = NaN, dm = Infinity; for (let k = -2; k <= 8; k++){ const v = mid / Math.pow(10, k), dd = Math.abs(Math.log(v / ref)); if (dd < dm){ dm = dd; mej = v; } } return mej; };
+const IG_REF_EUR = {USD: 1.15, JPY: 170, GBP: 0.87, CAD: 1.6, CHF: 0.93, AUD: 1.75, NZD: 1.95, CNH: 8.2, SEK: 11, NOK: 11.5, PLN: 4.3, MXN: 21};
 // Cuántas unidades de la moneda del mercado vale 1 euro (para pasar los € del stop a puntos)
 async function igEurA(cur){
   const base = (IG.cuenta && IG.cuenta.currency) || "EUR";
@@ -2247,7 +2250,8 @@ async function igEurA(cur){
   if (IG.cambio[cur] && Date.now() - IG.cambio[cur].t < 600e3) return IG.cambio[cur].v;
   const e = await igEpic(base + cur), d = await igDetalle(e);
   const s = await ig("/markets/" + encodeURIComponent(e), {version: "3"});
-  const v = ((igNum(s.snapshot.bid) + igNum(s.snapshot.offer)) / 2) / d.esc;
+  const v = igReal((igNum(s.snapshot.bid) + igNum(s.snapshot.offer)) / 2, IG_REF_EUR[cur] || ((igNum(s.snapshot.bid) + igNum(s.snapshot.offer)) / 2));
+  if (IG_REF_EUR[cur] && Math.abs(v / IG_REF_EUR[cur] - 1) > 0.5) throw new Error("cambio " + base + "/" + cur + " raro");
   if (!(v > 0)) throw new Error("sin cambio " + base + "/" + cur);
   IG.cambio[cur] = {v, t: Date.now()}; return v;
 }
@@ -2324,7 +2328,7 @@ function igPintaGraf(pls){
   $("gLoteT").textContent = "IG";
   const d = IG.mer[IG.epicAct], s = d && d.snap;
   const l = IG.pos.map((p, i) => [p, pls ? pls[i] : null]).filter(([p]) => p.market.epic === IG.epicAct);
-  caja.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG ${igModo()}</span>${s ? " · " + s.bid + " / " + s.offer : ""} · SL −${IG.cfg.sl || 8} € · TP +${IG.cfg.tp || 8} €` + l.map(([p, pl]) => igFila(p, pl)).join("");
+  caja.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG ${igModo()}</span>${s ? " · " + s.bid + " / " + s.offer : ""} · SL −${IG.cfg.sl || 8} € · TP +${IG.cfg.tp || 8} €${IG.aviso ? ' · <b style="color:var(--rojo)">⚠ ' + IG.aviso + "</b>" : ""}` + l.map(([p, pl]) => igFila(p, pl)).join("");
   caja.style.display = "block";
   igBotonesCerrar(caja);
 }
@@ -2344,9 +2348,11 @@ setInterval(async () => {
     const j = await ig("/markets/" + encodeURIComponent(epic), {version: "3"});
     if (IG.epicAct !== epic || !G) return;
     d.snap = j.snapshot || {};
-    const pr = ((igNum(d.snap.bid) + igNum(d.snap.offer)) / 2) / d.esc;
+    const dat0 = G.serie && G.serie.data ? G.serie.data() : [], u0 = dat0[dat0.length - 1];
+    let pr = u0 && u0.close > 0 ? igReal((igNum(d.snap.bid) + igNum(d.snap.offer)) / 2, u0.close) : NaN;
+    if (pr > 0 && u0 && Math.abs(pr / u0.close - 1) > 0.03){ IG.aviso = "el precio de IG no cuadra con las velas: no lo pinto"; pr = NaN; } else IG.aviso = "";
     if (pr > 0 && G.serie && G.serie.data){
-      const dat = G.serie.data(), u = dat[dat.length - 1];
+      const dat = dat0, u = u0;
       if (u && u.open != null){
         const ahora = Math.floor(Date.now() / 1000), fin = u.time + G.dur;
         if (ahora >= fin && ahora - fin < G.dur * 3){ const t = u.time + G.dur * Math.floor((ahora - u.time) / G.dur); G.serie.update({time: t, open: pr, high: pr, low: pr, close: pr}); }
@@ -2472,7 +2478,7 @@ if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-8";
+const APP_VERSION = "2026.11.10-9";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
