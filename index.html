@@ -2360,43 +2360,60 @@ const COS_MER = ["EURUSD", "GBPUSD", "USDJPY", "GBPJPY", "EURJPY", "EURGBP", "AU
 const XTB_SPR = {EURUSD: 1.0, GBPUSD: 1.65, USDJPY: 1.4, XAUUSD: 0.35, XAGUSD: 0.049, USOIL: 0.08};
 const cosFx = s => /^[A-Z]{6}$/.test(s) && !/^X|OIL/.test(s);
 const cosUd = s => cosFx(s) ? (s.endsWith("JPY") ? 100 : 10000) : 1;   // precio → pips (divisas) o dólares
+// Rango del precio real de cada mercado (una década): sirve para saber en qué escala da IG el precio
+const COS_RANGO = {EURUSD: .3, GBPUSD: .5, USDJPY: 50, GBPJPY: 100, EURJPY: 80, EURGBP: .3, AUDUSD: .2, USDCAD: .5, USDCHF: .3, XAUUSD: 1000, XAGUSD: 15, USOIL: 15};
+const cosEscala = (s, mid) => { const lo = COS_RANGO[s]; if (!lo || !(mid > 0)) return 0; for (let k = -2; k <= 8; k++){ const f = Math.pow(10, k); if (mid / f >= lo && mid / f < lo * 10) return f; } return 0; };
 async function igCostes(){
   const el = $("igCos");
   if (!igListo()){ el.innerHTML = '<p class="sub">Conecta IG primero.</p>'; return; }
   el.innerHTML = '<p class="sub">Calculando… (unos segundos)</p>';
+  const f2 = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).replace(".", ",") + " €";
+  // 1) Swap cobrado en 30 días (una sola petición)
+  let sw = "";
   try{
-    const eps = {};
-    for (const s of COS_MER){ try{ eps[s] = await igEpic(s); }catch(e){} }
-    const j = await ig("/markets?epics=" + Object.values(eps).map(encodeURIComponent).join(","), {version: "2"});
-    const snap = {}; (j.marketDetails || []).forEach(m => snap[m.instrument.epic] = m.snapshot || {});
+    const desde = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 19);
+    const h = await ig("/history/transactions?from=" + desde + "&pageSize=0", {version: "2"});
+    const fin = (h.transactions || []).filter(t => /fund|financ|interest|inter[eé]s|swap|rollover/i.test((t.instrumentName || "") + " " + (t.transactionType || "")));
+    const num = t => igNum(String(t.profitAndLoss || "").replace(/[^\d.,-]/g, "").replace(/,(?=\d{3}\b)/g, ""));
+    const porM = {}; let tot = 0;
+    fin.forEach(t => { const n = num(t) || 0; tot += n; const k = (t.instrumentName || "?").replace(/\s*(daily|funding|financiaci[oó]n|interest).*$/i, "").trim() || "?"; porM[k] = (porM[k] || 0) + n; });
+    sw = fin.length ? `<p><b>Swap cobrado por IG (30 días): ${f2(tot)}</b> en ${fin.length} cargos</p>` + Object.entries(porM).map(([k, v]) => `<div class="sub">${esc(k)}: ${f2(v)}</div>`).join("")
+      : '<p class="sub">IG no te ha cobrado swap en los últimos 30 días en esta cuenta (aún no has dejado posiciones abiertas de noche).</p>';
+  }catch(e){ sw = '<p class="sub">Swap: ' + esc(e.message) + ". Vuelve a pulsar en un minuto.</p>"; }
+  try{
+    // 2) Mercados de IG (se guardan en el móvil: solo la primera vez se buscan)
+    const eps = {}; let faltan = 0;
+    for (const s of COS_MER){ try{ eps[s] = await igEpic(s); }catch(e){ faltan++; if (/demasiadas/.test(e.message)) break; } }
+    // 3) Todos los precios y datos en una sola petición
+    const j = await ig("/markets?epics=" + Object.values(eps).map(encodeURIComponent).join(",") + "&filter=ALL", {version: "2"});
+    const md = {}; (j.marketDetails || []).forEach(m => md[m.instrument.epic] = m);
+    const real = {}, sp = {};
+    for (const s of COS_MER){
+      const m = eps[s] && md[eps[s]], sn = m && m.snapshot;
+      if (!sn || sn.bid == null || sn.offer == null) continue;
+      const bid = igNum(sn.bid), off = igNum(sn.offer), f = cosEscala(s, (bid + off) / 2);
+      if (!f) continue;
+      real[s] = (bid + off) / 2 / f; sp[s] = (off - bid) / f;
+    }
+    // Cuántas unidades de cada moneda vale 1 € (sacado de los mismos precios)
+    const eurA = {EUR: 1, USD: real.EURUSD, JPY: real.EURJPY, GBP: real.EURGBP,
+      CAD: real.EURUSD && real.USDCAD && real.EURUSD * real.USDCAD, CHF: real.EURUSD && real.USDCHF && real.EURUSD * real.USDCHF};
     let filas = "";
     for (const s of COS_MER){
-      const e = eps[s], sn = e && snap[e];
-      if (!sn || sn.bid == null){ filas += `<tr><td>${esc(merDe(s)[1])}</td><td>—</td><td>${XTB_SPR[s] ?? "—"}</td><td>—</td></tr>`; continue; }
-      const d = await igDetalle(e).catch(() => null), esc_ = (d && d.esc) || igNum(sn.scalingFactor) || 1;
-      const pts = igNum(sn.offer) - igNum(sn.bid), pr = (igNum(sn.offer) + igNum(sn.bid)) / 2 / esc_;
-      const ig_ = pts / esc_ * cosUd(s), x = XTB_SPR[s];
-      let eur = "—";
-      if (d){ const tam = igTam(e) || d.min; try{ eur = (pts * tam * d.vPip / await igEurA(d.cur)).toFixed(2).replace(".", ",") + " €"; }catch(err){} }
-      const dec = cosFx(s) ? 2 : 3, mi = x == null ? "" : ig_ < x ? "ig" : ig_ > x ? "x" : "";
-      filas += `<tr><td>${esc(merDe(s)[1])}</td><td class="${mi === "ig" ? "mej" : ""}">${ig_.toFixed(dec).replace(".", ",")}</td><td class="${mi === "x" ? "mej" : ""}">${x == null ? "—" : String(x).replace(".", ",")}</td><td>${eur}</td></tr>`;
+      const x = XTB_SPR[s], xs = x == null ? "—" : String(x).replace(".", ",");
+      if (sp[s] == null){ filas += `<tr><td>${esc(merDe(s)[1])}</td><td>—</td><td>${xs}</td><td>—</td></tr>`; continue; }
+      const v = sp[s] * cosUd(s), m = md[eps[s]], ins = m.instrument || {}, dr = m.dealingRules || {};
+      const cur = ((ins.currencies || []).find(c => c.isDefault) || (ins.currencies || [])[0] || {}).code || s.slice(3, 6);
+      const pip = igNum(String(ins.onePipMeans || "").split(" ")[0]), vPip = igNum(ins.valueOfOnePip);
+      const tam = igTam(eps[s]) || igNum(dr.minDealSize && dr.minDealSize.value) || 1, r = eurA[cur];
+      const eur = pip > 0 && vPip > 0 && r > 0 ? (sp[s] / pip * tam * vPip / r).toFixed(2).replace(".", ",") + " €" : "—";
+      const dec = cosFx(s) ? 1 : 2, mi = x == null ? "" : v < x ? "ig" : v > x ? "x" : "";
+      filas += `<tr><td>${esc(merDe(s)[1])}</td><td class="${mi === "ig" ? "mej" : ""}">${v.toFixed(dec).replace(".", ",")}</td><td class="${mi === "x" ? "mej" : ""}">${xs}</td><td>${eur}</td></tr>`;
     }
-    let sw = "";
-    try{
-      const desde = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 19);
-      const h = await ig("/history/transactions?from=" + desde + "&pageSize=0", {version: "2"});
-      const fin = (h.transactions || []).filter(t => /fund|financ|interest|inter[eé]s|swap|rollover/i.test((t.instrumentName || "") + " " + (t.transactionType || "")));
-      const num = t => igNum(String(t.profitAndLoss || "").replace(/[^\d.,-]/g, "").replace(/,(?=\d{3}\b)/g, ""));
-      const porM = {}; let tot = 0;
-      fin.forEach(t => { const n = num(t) || 0; tot += n; const k = (t.instrumentName || "?").replace(/\s*(daily|funding|financiaci[oó]n|interest).*$/i, "").trim() || "?"; porM[k] = (porM[k] || 0) + n; });
-      const f = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).replace(".", ",") + " €";
-      sw = fin.length ? `<p><b>Swap cobrado por IG (30 días): ${f(tot)}</b> en ${fin.length} cargos</p>` + Object.entries(porM).map(([k, v]) => `<div class="sub">${esc(k)}: ${f(v)}</div>`).join("")
-        : '<p class="sub">IG no te ha cobrado swap en los últimos 30 días en esta cuenta (o aún no has dejado posiciones abiertas de noche).</p>';
-    }catch(e){ sw = '<p class="sub">No pude leer el historial de swap: ' + esc(e.message) + "</p>"; }
     el.innerHTML = `<table><tr><th>Mercado</th><th>IG ahora</th><th>XTB media</th><th>IG € por op.</th></tr>${filas}</table>
-      <p class="sub">Divisas en pips; oro, plata y petróleo en dólares. En verde, el más barato. «IG € por op.» es lo que te cuesta el spread con el tamaño que usas en cada mercado.</p>${sw}
+      <p class="sub">Divisas en pips; oro, plata y petróleo en dólares. En verde, el más barato. «IG € por op.» es lo que te cuesta el spread con el tamaño que usas en cada mercado (o el mínimo de IG).${faltan ? " Algunos mercados no se pudieron buscar: vuelve a pulsar en un minuto." : ""}</p>${sw}
       <p class="sub">Swap: IG cobra la tasa del mercado (tom-next) + 0,8 % anual en divisas; XTB usa puntos swap distintos para cada mercado y sentido. Ninguno cobra comisión en estos mercados: el coste va en el spread.</p>`;
-  }catch(e){ el.innerHTML = '<p class="sub">❌ ' + esc(e.message) + "</p>"; }
+  }catch(e){ el.innerHTML = '<p class="sub">❌ ' + esc(e.message) + (/demasiadas/.test(e.message) ? ". Vuelve a pulsar dentro de un minuto." : "") + "</p>" + sw; }
 }
 $("igCosB").onclick = igCostes;
 // Pantalla IG
@@ -2437,7 +2454,7 @@ if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-3";
+const APP_VERSION = "2026.11.10-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
