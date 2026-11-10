@@ -2126,7 +2126,8 @@ const igBase = () => IG.cfg && IG.cfg.real ? "https://api.ig.com/gateway/deal" :
 const igModo = () => IG.cfg && IG.cfg.real ? "REAL" : "DEMO";
 const igCab = v => ({"Content-Type": "application/json; charset=UTF-8", "Accept": "application/json; charset=UTF-8", "X-IG-API-KEY": IG.cfg.key, "Version": v});
 const igErr = c => ({
-  "error.security.invalid-details": "usuario o contraseña incorrectos",
+  "error.security.invalid-details": "usuario o contraseña incorrectos (en DEMO son los de la cuenta demo). No lo intento más para que IG no bloquee la cuenta",
+  "error.security.account-suspended": "IG tiene la cuenta bloqueada", "error.security.account-locked": "IG tiene la cuenta bloqueada",
   "error.security.api-key-invalid": "la clave API no es válida (¿es de la cuenta " + igModo() + "?)",
   "error.security.api-key-disabled": "la clave API está desactivada en IG",
   "error.public-api.exceeded-api-key-allowance": "demasiadas peticiones a IG: espera un minuto",
@@ -2139,7 +2140,12 @@ const igErr = c => ({
 async function igLogin(){
   const r = await fetch(igBase() + "/session", {method: "POST", headers: igCab("3"), body: JSON.stringify({identifier: IG.cfg.usr, password: IG.cfg.pwd})});
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.oauthToken) throw new Error(igErr(j.errorCode || "HTTP " + r.status));
+  if (!r.ok || !j.oauthToken){
+    // Si IG rechaza el usuario o la contraseña, se borra la contraseña guardada para no volver a intentarlo solo
+    // (varios intentos fallidos bloquean la cuenta de IG)
+    if (/invalid-details|locked|suspended/i.test(j.errorCode || "")){ IG.cfg = {...IG.cfg, pwd: ""}; store("bolsa_ig", IG.cfg); IG.cuenta = null; }
+    throw new Error(igErr(j.errorCode || "HTTP " + r.status));
+  }
   IG.tok = {acc: j.oauthToken.access_token, ref: j.oauthToken.refresh_token, hasta: Date.now() + ((+j.oauthToken.expires_in || 60) - 10) * 1000, cuenta: j.accountId};
 }
 async function igRefresca(){
@@ -2361,7 +2367,7 @@ if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {
 
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-1";
+const APP_VERSION = "2026.11.10-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
