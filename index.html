@@ -135,6 +135,8 @@ body.conIG #graf,body.conIG #hoja,body.conIG #posF{top:calc(env(safe-area-inset-
 #gPosL button span{flex:1}#gPosL button small{font:400 12px "JetBrains Mono",monospace;color:var(--mut)}
 #gPosL b{font-size:11px;padding:1px 6px;border-radius:5px}#gPosL b.l{background:var(--verde);color:#0E1A14}#gPosL b.c{background:var(--rojo);color:#fff}
 #graf h3{flex:1;margin:0;font-size:18px;line-height:1.25}
+#gOrig{font:700 12px Archivo,sans-serif;margin:2px 0 4px;padding:3px 8px;border-radius:8px;align-self:flex-start;background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
+#gOrig.ig{background:#3A2A12;color:var(--oro);border-color:var(--oro)}
 #graf h3 small{display:block;color:var(--oro);font-size:14px}
 #gTfs{display:flex;gap:4px;margin:8px 0}
 #gTfs button{flex:1;min-width:0;padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:700 13px "JetBrains Mono",monospace;cursor:pointer}
@@ -411,6 +413,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 </div>
 <div id="graf">
   <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gPosB" aria-label="Posiciones abiertas">📌</button><button class="ico" id="gHisB" aria-label="Posiciones cerradas">📜</button><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
+  <div id="gOrig"></div>
   <div id="gPosL"></div>
   <div id="gTfs"></div>
   <div id="gCaja"><div id="gPL"></div><div id="gLinea"><span id="gEtq"></span><div id="gSig"></div></div><div id="gRadar"></div><button id="gAuto" title="Ajustar las velas automáticamente">AUTO</button><button id="gMacd" title="Poner o quitar el MACD">MACD</button><button id="gZp" title="Estirar las velas en altura">↕+</button><button id="gZm" title="Encoger las velas en altura">↕−</button></div>
@@ -969,6 +972,7 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
   G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none"; $("gSig").innerHTML = "";
   simGraf = sim;
   if (!store("bolsa_llave")) { toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
+  fijaModoGraf($("graf").classList.contains("on"));
   $("graf").classList.add("on");
   $("gTit").innerHTML = `${esc(titulo.replace(/ · [MHDW]\d*$/, "") + " · " + nombreTF(TF_NOM[tf] ? tf : "240"))}${fuenteGraf === "ctrader" ? ' <span style="font-size:.6em;background:#2F6FED;color:#fff;border-radius:6px;padding:1px 6px;vertical-align:middle">cTrader</span>' : ""}<small id="gCamb">${cambio ? "📍 " + esc(cambio) : posiciones().some(p => p.sim === sim) ? "📌 Con tu posición dibujada" : "Sin hora de cambio en esta línea"}</small>`
     + (selRadar ? `<select id="gRadSel" title="Radar con el que se calcula la línea amarilla">${B_RADARES.map((r, i) => `<option value="${i}"${i === selRadar.i ? " selected" : ""}>Radar ${esc(r.n)}</option>`).join("")}</select>` : "");
@@ -1185,11 +1189,25 @@ $("gPosB").onclick = () => {
 let grafIG = false;
 const tL = () => grafIG ? "▲ COMPRAR" : "▲ LARGO", tC = () => grafIG ? "▼ VENDER" : "▼ CORTO";
 const pintaOpTxt = () => { $("gLargo").textContent = tL(); $("gCorto").textContent = tC(); };
-$("abreGrafCT").onclick = () => { grafIG = false; pintaOpTxt(); fuenteGraf = "ctrader"; abreGrafElegido(); };
-$("abreGraf").onclick = () => { grafIG = false; pintaOpTxt(); fuenteGraf = "yahoo"; abreGrafElegido(); };
+// Desde qué botón se abrió el gráfico: "ig" (opera en IG), "ct" (cTrader) o "app" (el de siempre)
+let grafPend = null, grafModo = "app";
+const ORIGEN = {ig: "🏦 Entraste por «Gráfico cTrader · operar en IG» · COMPRAR / VENDER operan de verdad en IG",
+  ct: "📊 Entraste por «Gráfico cTrader con la línea del cambio» · solo mirar, no opera",
+  app: "📍 Entraste por «Gráfico con la línea del cambio» · solo mirar, no opera"};
+function fijaModoGraf(yaAbierto){
+  if (grafPend){ grafModo = grafPend; grafPend = null; }
+  else if (!yaAbierto) grafModo = fuenteGraf === "ctrader" ? "ct" : "app";
+  grafIG = grafModo === "ig";
+  pintaOpTxt();
+  $("gOp").style.display = grafIG ? "" : "none";
+  $("gOrig").textContent = ORIGEN[grafModo]; $("gOrig").className = grafIG ? "ig" : "";
+  if (!grafIG){ $("gIG").style.display = "none"; if (typeof TK !== "undefined" && TK) tkFuera(); }
+}
+$("abreGrafCT").onclick = () => { grafPend = "ct"; fuenteGraf = "ctrader"; abreGrafElegido(); };
+$("abreGraf").onclick = () => { grafPend = "app"; fuenteGraf = "yahoo"; abreGrafElegido(); };
 $("abreGrafIG").onclick = () => {
   if (!igListo()){ cierraHoja(); toast("Primero conecta IG (usuario, contraseña y clave API)", 4000); $("bIG").onclick(); return; }
-  grafIG = true; pintaOpTxt(); fuenteGraf = "ctrader"; abreGrafElegido();   // velas de cTrader, operaciones en IG
+  grafPend = "ig"; fuenteGraf = "ctrader"; abreGrafElegido();   // velas de cTrader, operaciones en IG
 };
 function abreGrafElegido(){
   if (!elegido) return;
@@ -2595,7 +2613,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-14";
+const APP_VERSION = "2026.11.10-15";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
