@@ -2376,8 +2376,8 @@ function tkLineas(){
   if (TK.serie !== G.serie){
     TK.serie = G.serie;
     TK.lEn = G.serie.createPriceLine({price: TK.ent, color: "#F5C451", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: TK.dir === "L" ? "▲ ENTRADA" : "▼ ENTRADA"});
-    TK.lSL = G.serie.createPriceLine({price: TK.sl, color: "#E5484D", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "SL"});
-    TK.lTP = G.serie.createPriceLine({price: TK.tp, color: "#2FBF71", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "TP"});
+    TK.lSL = G.serie.createPriceLine({price: TK.sl, color: "#E5484D", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "SL"});
+    TK.lTP = G.serie.createPriceLine({price: TK.tp, color: "#2FBF71", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "TP"});
   }
   const largo = TK.dir === "L";
   const eSL = -Math.abs(TK.ent - TK.sl) / TK.d.pip * TK.eurPunto, eTP = Math.abs(TK.tp - TK.ent) / TK.d.pip * TK.eurPunto;
@@ -2555,8 +2555,8 @@ function igDibuja(ps){
     const ent = pr(x.level); if (!(ent > 0)) continue;
     const f = igNum(x.level) / ent;   // precio de IG / precio del gráfico
     lin.push(G.serie.createPriceLine({price: ent, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (compra ? "▲ COMPRA " : "▼ VENTA ") + String(x.size).replace(".", ",")}));
-    if (x.stopLevel){ const l = G.serie.createPriceLine({price: pr(x.stopLevel), color: "#E5484D", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "SL ⇕"}); lin.push(l); h.push({t: "sl", l, precio: pr(x.stopLevel), p, f, ent}); }
-    if (x.limitLevel){ const l = G.serie.createPriceLine({price: pr(x.limitLevel), color: "#2FBF71", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "TP ⇕"}); lin.push(l); h.push({t: "tp", l, precio: pr(x.limitLevel), p, f, ent}); }
+    if (x.stopLevel){ const l = G.serie.createPriceLine({price: pr(x.stopLevel), color: "#E5484D", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "SL ⇕"}); lin.push(l); h.push({t: "sl", l, precio: pr(x.stopLevel), p, f, ent}); }
+    if (x.limitLevel){ const l = G.serie.createPriceLine({price: pr(x.limitLevel), color: "#2FBF71", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "TP ⇕"}); lin.push(l); h.push({t: "tp", l, precio: pr(x.limitLevel), p, f, ent}); }
     const s = x.createdDateUTC || "", t = Date.parse(/Z$/.test(s) ? s : s + "Z");
     if (t > 0){
       const tE = aMadrid(t / 1000); let v = null;
@@ -2802,7 +2802,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-21";
+const APP_VERSION = "2026.11.11-22";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
