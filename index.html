@@ -1214,19 +1214,19 @@ $("gPosB").onclick = () => {
 };
 // grafIG: el gráfico abierto opera en IG (COMPRAR / VENDER de verdad)
 let grafIG = false;
-const tL = () => grafIG ? "▲ COMPRAR" : "▲ LARGO", tC = () => grafIG ? "▼ VENDER" : "▼ CORTO";
+const tL = () => grafIG ? "▲ COMPRAR" : "▲ LARGO FICTICIO", tC = () => grafIG ? "▼ VENDER" : "▼ CORTO FICTICIO";
 const pintaOpTxt = () => { $("gLargo").textContent = tL(); $("gCorto").textContent = tC(); };
 // Desde qué botón se abrió el gráfico: "ig" (opera en IG), "ct" (cTrader) o "app" (el de siempre)
 let grafPend = null, grafModo = "app";
 const ORIGEN = {ig: "🏦 Entraste por «Gráfico cTrader · operar en IG» · COMPRAR / VENDER operan de verdad en IG",
-  ct: "📊 Entraste por «Gráfico cTrader con la línea del cambio» · solo mirar, no opera",
-  app: "📍 Entraste por «Gráfico con la línea del cambio» · solo mirar, no opera"};
+  ct: "📊 Entraste por «Gráfico cTrader con la línea del cambio» · LARGO / CORTO FICTICIO solo apuntan, no operan",
+  app: "📍 Entraste por «Gráfico con la línea del cambio» · LARGO / CORTO FICTICIO solo apuntan, no operan"};
 function fijaModoGraf(yaAbierto){
   if (grafPend){ grafModo = grafPend; grafPend = null; }
   else if (!yaAbierto) grafModo = fuenteGraf === "ctrader" ? "ct" : "app";
   grafIG = grafModo === "ig";
   pintaOpTxt();
-  $("gOp").style.display = grafIG ? "" : "none";
+  $("gOp").style.display = "";   // en IG operan de verdad; en los demás gráficos apuntan una posición ficticia
   $("gOrig").textContent = ORIGEN[grafModo]; $("gOrig").className = grafIG ? "ig" : "";
   if (!grafIG){ $("gIG").style.display = "none"; if (typeof TK !== "undefined" && TK) tkFuera(); }
 }
@@ -1599,6 +1599,7 @@ $("gLote").onchange = () => { const v = +String($("gLote").value).replace(",", "
 function rapida(dir, b){
   if (!G || !simGraf || G.ultimo == null){ toast("Espera a que carguen las velas", 2500); return; }
   if (grafIG && igListo()){ igTicket(dir); return; }
+  if (!grafIG) b.dataset.seguro = 1;   // ficticio: con un toque basta
   if (!b.dataset.seguro){
     document.querySelectorAll("#gOp button").forEach(x => { delete x.dataset.seguro; x.classList.remove("seg2"); x.textContent = x.id === "gLargo" ? tL() : tC(); });
     b.dataset.seguro = 1; b.classList.add("seg2"); b.textContent = "¿" + (dir === "L" ? tL() : tC()).slice(2) + "? Otra vez";
@@ -1612,7 +1613,7 @@ function rapida(dir, b){
   const p = {id: String(Date.now()), sim, tv, dir, precio: G.ultimo, hora: Math.floor(Date.now() / 1000), sl: null, tp: null, lote};
   const l = posiciones(); l.push(p); l.sort((a, c) => c.hora - a.hora); guardaPos(l);
   if (navigator.vibrate) try{ navigator.vibrate(60); }catch(e){}
-  toast((dir === "L" ? tL() : tC()) + " apuntado: lote " + String(lote).replace(".", ",") + " a " + fmtP(G.ultimo) + ". Si en XTB entraste a otro precio, cámbialo en MIS POSICIONES.", 4500);
+  toast((dir === "L" ? tL() : tC()) + " apuntado: lote " + String(lote).replace(".", ",") + " a " + fmtP(G.ultimo) + ". Lo tienes en MIS POSICIONES FICTICIAS.", 4000);
   abreGraf(simGraf, G.tf, G.cambio, G.titulo, G.tfsPedidas);
 }
 $("gLargo").onclick = function(){ rapida("L", this); };
@@ -2175,8 +2176,8 @@ const AYUDA = {
   "#gAuto": "AUTO: las velas se ajustan solas al alto de la pantalla. Quítalo para estirar o encoger el eje de precios a mano.",
   "#gZp": "Estira las velas en altura (más zoom vertical). También: pellizca con los dedos uno encima del otro.",
   "#gZm": "Encoge las velas en altura (menos zoom vertical). AUTO lo devuelve a su alto normal.",
-  "#gLargo": "Apunta al momento una compra (LARGO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Pulsa dos veces.",
-  "#gCorto": "Apunta al momento una venta (CORTO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Pulsa dos veces.",
+  "#gLargo": "Apunta al momento una compra (LARGO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Es ficticio: no opera en ningún bróker.",
+  "#gCorto": "Apunta al momento una venta (CORTO) de este mercado con el lote de al lado, al último precio y con la hora de ahora. Es ficticio: no opera en ningún bróker.",
   "#gLote": "Tamaño del lote que se apunta con LARGO o CORTO. Se queda guardado.",
   "#gHisB": "Historial: tus posiciones cerradas, con lo ganado o perdido. Pulsa una y se abre su gráfico.",
   "#posHis": "Historial: tus posiciones cerradas, con lo ganado o perdido y el total.",
@@ -2727,7 +2728,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-guardar";
+const APP_VERSION = "2026.11.11-ficticio";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
