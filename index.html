@@ -86,7 +86,7 @@ h2{font-size:19px;margin:0 0 6px;line-height:1.25}
 input{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:#0B140F;color:var(--txt);font:400 15px "JetBrains Mono",monospace;margin:8px 0}
 details summary{cursor:pointer;color:var(--mut);font-size:14px;margin:8px 0}
 footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-height:1.6}
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:var(--oro);color:#0E1A14;font-weight:700;padding:12px 18px;border-radius:14px;transition:transform .3s;z-index:9;max-width:90%;text-align:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:var(--oro);color:#0E1A14;font-weight:700;padding:12px 18px;border-radius:14px;transition:transform .3s;z-index:100;max-width:90%;text-align:center}
 #toast.show{transform:translateX(-50%) translateY(0)}
 #install{display:none}
 #hoja{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:8}
@@ -1508,10 +1508,16 @@ $("pfUlt").onclick = async () => {
   try{ const u = await ultimoPrecio($("pfMer").value); if (u){ $("pfPre").value = u.precio; toast("Último precio guardado (" + hace(u.guardado) + ")", 3000); } }
   catch(e){ toast("No se ha podido leer el precio", 3000); }
 };
-$("pfGuarda").onclick = () => {
+$("pfGuarda").onclick = async () => {
   const num = id => { const v = $(id).value.trim().replace(",", "."); return v === "" ? null : +v; };
+  // Sin precio: se coge solo el último precio de ese mercado
+  if ($("pfPre").value.trim() === "" && store("bolsa_llave")){
+    $("pfGuarda").disabled = true; $("pfGuarda").textContent = "Leyendo el precio…";
+    try{ const u = await ultimoPrecio($("pfMer").value); if (u) $("pfPre").value = u.precio; }catch(e){}
+    $("pfGuarda").disabled = false; $("pfGuarda").textContent = "Guardar posición";
+  }
   const precio = num("pfPre");
-  if (!precio || isNaN(precio)){ toast("Pon el precio de entrada", 2500); return; }
+  if (!precio || isNaN(precio)){ toast("No hay precio de este mercado: escribe el precio de entrada", 3500); return; }
   const sl = num("pfSL"), tp = num("pfTP");
   if ((sl != null && isNaN(sl)) || (tp != null && isNaN(tp))){ toast("Revisa el stop loss y el take profit", 2500); return; }
   const hora = $("pfHora").value ? Math.floor(new Date($("pfHora").value).getTime() / 1000) : Math.floor(Date.now() / 1000);
@@ -2721,7 +2727,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-posiciones";
+const APP_VERSION = "2026.11.11-guardar";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
