@@ -135,6 +135,8 @@ body.conIG #graf,body.conIG #hoja,body.conIG #posF{top:calc(env(safe-area-inset-
 #gPosL button span{flex:1}#gPosL button small{font:400 12px "JetBrains Mono",monospace;color:var(--mut)}
 #gPosL b{font-size:11px;padding:1px 6px;border-radius:5px}#gPosL b.l{background:var(--verde);color:#0E1A14}#gPosL b.c{background:var(--rojo);color:#fff}
 #graf h3{flex:1;margin:0;font-size:18px;line-height:1.25}
+#graf.solo #gOp,#graf.solo #gIG,#graf.solo #gNota{display:none!important}
+#gSolo.on{background:var(--oro);color:#0E1A14}
 #gOrig{font:700 12px Archivo,sans-serif;margin:2px 0 4px;padding:3px 8px;border-radius:8px;align-self:flex-start;background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
 #gOrig.ig{background:#3A2A12;color:var(--oro);border-color:var(--oro)}
 #graf h3 small{display:block;color:var(--oro);font-size:14px}
@@ -431,7 +433,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   </div>
 </div>
 <div id="graf">
-  <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gPosB" aria-label="Posiciones abiertas">📌</button><button class="ico" id="gHisB" aria-label="Posiciones cerradas">📜</button><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
+  <div class="cab"><h3 id="gTit"></h3><button class="ico" id="gPosB" aria-label="Posiciones abiertas">📌</button><button class="ico" id="gHisB" aria-label="Posiciones cerradas">📜</button><button class="ico" id="gSolo" aria-label="Solo el gráfico" title="Ocultar o enseñar la parte de abajo">⬇</button><button class="ico" id="gCerrar" aria-label="Cerrar">✕</button></div>
   <div id="gOrig"></div>
   <div id="gPosL"></div>
   <div id="gTfs"></div>
@@ -2786,6 +2788,10 @@ $("igSalir").onclick = () => {
 // Al abrir la app, si ya había datos de IG, se conecta sola
 if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key) igConectar().catch(() => {});
 
+// ---------- Solo el gráfico: ocultar o enseñar la parte de abajo (se recuerda) ----------
+function pintaSolo(){ const on = !!store("bolsa_solo_graf"); $("graf").classList.toggle("solo", on); $("gSolo").classList.toggle("on", on); $("gSolo").textContent = on ? "⬆" : "⬇"; }
+$("gSolo").onclick = () => { store("bolsa_solo_graf", !store("bolsa_solo_graf")); pintaSolo(); toast(store("bolsa_solo_graf") ? "Solo el gráfico (pulsa ⬆ para ver la parte de abajo)" : "Parte de abajo visible", 2000); };
+pintaSolo();
 // ---------- Salir ----------
 $("bSalir").onclick = () => {
   const b = $("bSalir");
@@ -2796,7 +2802,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-20";
+const APP_VERSION = "2026.11.11-21";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
