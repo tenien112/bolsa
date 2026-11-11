@@ -368,10 +368,28 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <div id="bRec"></div>
 </section>
 
-<!-- MIS POSICIONES -->
-<section class="pant" id="pPos">
+<!-- MIS POSICIONES: menú -->
+<section class="pant" id="pPosMenu">
   <button class="volver" data-ir="pInicio">← Volver</button>
   <h2>📌 MIS POSICIONES</h2>
+  <div class="lista">
+    <button class="opc" id="bPosIG" style="border-left-color:#FFB37F">🏦 MIS POSICIONES EN IG<small>Las que tienes abiertas de verdad en tu cuenta de IG. Pulsa una y ves su gráfico.</small></button>
+    <button class="opc" id="bPosFic" style="border-left-color:#C9A2FF">📝 MIS POSICIONES FICTICIAS<small>Las que apuntas a mano en la app (las de XTB o de prueba).</small></button>
+  </div>
+</section>
+
+<!-- MIS POSICIONES EN IG -->
+<section class="pant" id="pPosIG">
+  <button class="volver" data-ir="pPosMenu">← Volver</button>
+  <h2>🏦 MIS POSICIONES EN IG</h2>
+  <div id="lPosIG"></div>
+  <button class="btn sec" id="posIGAct" style="margin-top:10px">↻ Actualizar</button>
+</section>
+
+<!-- MIS POSICIONES FICTICIAS -->
+<section class="pant" id="pPos">
+  <button class="volver" data-ir="pPosMenu">← Volver</button>
+  <h2>📝 MIS POSICIONES FICTICIAS</h2>
   <p class="sub">Las posiciones que apuntes aquí (las que abres en XTB o cTrader). Se ven también dibujadas en el gráfico de la app. Se guardan en este móvil.</p>
   <div id="lPos"></div>
   <button class="btn" id="posNueva">➕ Apuntar una posición</button>
@@ -1166,13 +1184,22 @@ $("posHis").onclick = () => {
 };
 // Botón 📌 del gráfico: lista de posiciones abiertas; al pulsar una se abre su gráfico
 function marcaPosB(){
-  const n = posiciones().length, b = $("gPosB");
+  const n = grafIG && typeof igListo === "function" && igListo() ? IG.pos.length : posiciones().length, b = $("gPosB");
   b.innerHTML = "📌" + (n ? `<i>${n}</i>` : "");
 }
 $("gPosB").onclick = () => {
   const L = $("gPosL");
   if (L.classList.contains("on") && L.dataset.v === "a"){ L.classList.remove("on"); return; }
   L.dataset.v = "a";
+  if (grafIG && igListo()){
+    if (!IG.pos.length){ toast("No tienes posiciones abiertas en IG", 2500); return; }
+    L.innerHTML = `<div class="h">POSICIONES ABIERTAS EN IG · pulsa una para ver su gráfico</div>` + IG.pos.map(p => {
+      const x = p.position, c = x.direction !== "BUY";
+      return `<button data-ig="${esc(x.dealId)}" class="${c ? "c" : ""} ${p.market.epic === IG.epicAct ? "ya" : ""}"><span>${esc(p.market.instrumentName || p.market.epic)} <b class="${c ? "c" : "l"}">${c ? "▼ VENTA" : "▲ COMPRA"}</b></span><small>${String(x.size).replace(".", ",")} · ${x.level}</small></button>`;
+    }).join("");
+    L.querySelectorAll("button").forEach(b => b.onclick = () => { L.classList.remove("on"); abrePosIG(b.dataset.ig); });
+    L.classList.add("on"); return;
+  }
   const l = posiciones();
   if (!l.length){ toast("No tienes posiciones abiertas apuntadas", 2500); return; }
   L.innerHTML = `<div class="h">POSICIONES ABIERTAS · pulsa una para ver su gráfico</div>` + l.map(p => {
@@ -1181,8 +1208,7 @@ $("gPosB").onclick = () => {
   }).join("");
   L.querySelectorAll("button").forEach(b => b.onclick = () => {
     const p = posiciones().find(x => x.id === b.dataset.id); L.classList.remove("on"); if (!p) return;
-    simTV = p.tv;
-    abreGraf(p.sim, G && G.tf ? G.tf : "60", "", merDe(p.sim)[1] + " · H1", []);
+    abreGrafPos(p.sim, p.tv, "fic", null, G && G.tf ? G.tf : "60");
   });
   L.classList.add("on");
 };
@@ -1505,7 +1531,24 @@ $("abrePos").onclick = () => {
   abrePosF(MERCADOS.some(m => m[0] === sim) ? sim : null, null);
 };
 $("posNueva").onclick = () => abrePosF(null, null);
-$("bPos").onclick = () => { ir("pPos"); pintaPosiciones(); };
+$("bPos").onclick = () => ir("pPosMenu");
+$("bPosFic").onclick = () => { ir("pPos"); pintaPosiciones(); };
+$("bPosIG").onclick = () => { ir("pPosIG"); pintaPosIG(); };
+$("posIGAct").onclick = () => pintaPosIG();
+// Abre el gráfico de una posición (IG o ficticia) con la línea amarilla del último cambio del radar elegido
+// (el mismo selector de radar que en BUSCAR VALOR) y la posición dibujada
+async function abreGrafPos(sim, tv, modo, idx, tf){
+  if (!store("bolsa_llave")){ toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
+  if (idx == null) idx = bRadarIdx();
+  const R = B_RADARES[idx], enMer = MERCADOS.some(m => m[0] === sim);
+  fuenteGraf = enMer ? "ctrader" : "yahoo";
+  let cambio = "";
+  try{ cambio = cambioBuscado(await leeVelas(sim), R.tfs); }catch(e){}
+  grafPend = modo === "ig" ? "ig" : fuenteGraf === "ctrader" ? "ct" : "app";
+  simTV = tv;
+  if (!$("graf").classList.contains("on")) abreCapa();
+  abreGraf(sim, tf || "60", cambio, merDe(sim)[1] + " · H1", R.tfs, {i: idx, cambia: (k, t) => abreGrafPos(sim, tv, modo, k, t)});
+}
 async function pintaPosiciones(){
   const l = posiciones(), cont = $("lPos");
   if (!l.length){ cont.innerHTML = `<div class="vacio" style="margin-bottom:12px">No tienes posiciones apuntadas. Pulsa «Apuntar una posición», o pulsa un mercado en un radar y elige «Apuntar mi posición».</div>`; return; }
@@ -1525,10 +1568,7 @@ async function pintaPosiciones(){
     else if (b.dataset.a === "x"){
       if (b.dataset.seguro){ (async () => { let u = null; try{ u = await ultimoPrecio(p.sim); }catch(e){} if (u) cierraPos(p, u.precio); else { guardaPos(posiciones().filter(x => x.id !== p.id)); toast("Posición quitada", 2000); } pintaPosiciones(); })(); }
       else { b.dataset.seguro = 1; b.textContent = "¿Quitar? Pulsa otra vez"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "🔒 Cerrar"; } }, 4000); }
-    } else {
-      simTV = p.tv; abreCapa();
-      abreGraf(p.sim, "60", "", merDe(p.sim)[1] + " · H1", []);
-    }
+    } else abreGrafPos(p.sim, p.tv, "fic");
   });
   if (!store("bolsa_llave")){ l.forEach(p => { const el = $("r" + p.id); if (el) el.innerHTML = "<small>Pon tu llave de GitHub en ⚙️ para ver el precio</small>"; }); return; }
   for (const sim of [...new Set(l.map(p => p.sim))]){
@@ -2102,7 +2142,9 @@ const AYUDA = {
   '#pInicio [data-ir="pComMenu"]': "Abre el menú de COMUNES: los mercados en los que coinciden radares y robots (COMUNES RADAR Y BOT, COMUNES M5-H4 y SUPERCOMÚN).",
   "#bBuscar": "BUSCAR VALOR: escribe cualquier par, acción, índice, materia prima o cripto, eliges el tuyo entre los que coinciden y te abre su gráfico en la app, con la línea amarilla del último cambio, el MACD y el radar al tocar una vela.",
   "#bIr": "Busca el valor en GitHub (tarda 1-2 minutos) y abre su gráfico.",
-  "#bPos": "MIS POSICIONES: las posiciones que apuntes a mano. Ves lo que va ganando o perdiendo cada una y salen dibujadas en el gráfico de la app.",
+  "#bPos": "MIS POSICIONES: elige entre tus posiciones de verdad en IG o las ficticias que apuntas a mano.",
+  "#bPosIG": "Tus posiciones abiertas en IG. Pulsa una y se abre su gráfico con la entrada, el SL, el TP y la línea amarilla del último cambio.",
+  "#bPosFic": "Las posiciones que apuntas a mano. Pulsa una y se abre su gráfico con la línea amarilla y tu posición dibujada.",
   "#install": "Instala BOLSA-LORENZITO como una aplicación más, con su icono.",
   ".volver": "Vuelve a la pantalla anterior.",
   "#bComunes": "Ejecuta el RADAR CAMBIO TENDENCIAS y el BOT COMPRAVENTA y te enseña dónde coinciden: mercados BAJISTAS en el radar con el bot en CORTO, y ALCISTAS con el bot en LARGO.",
@@ -2448,7 +2490,71 @@ async function igPintaPos(){
     igBotonesCerrar($("igPos"));
     try{ const a = await ig("/accounts"); IG.cuenta = (a.accounts || []).find(c => c.accountId === IG.cuenta.accountId) || IG.cuenta; pintaIGEst(); }catch(e){}
     igPintaGraf(pls);
-  }catch(e){ $("igPos").innerHTML = '<p class="sub">No se pudieron leer: ' + esc(e.message) + "</p>"; }
+    if (pantalla === "pPosIG") pintaListaIG(pls);
+  }catch(e){
+    $("igPos").innerHTML = '<p class="sub">No se pudieron leer: ' + esc(e.message) + "</p>";
+    if (pantalla === "pPosIG") $("lPosIG").innerHTML = '<div class="vacio">No se pudieron leer tus posiciones de IG: ' + esc(e.message) + "</div>";
+  }
+}
+// MIS POSICIONES EN IG: lista de las posiciones abiertas de verdad en IG; al pulsar una, su gráfico
+async function pintaPosIG(){
+  const c = $("lPosIG");
+  if (!igListo()){
+    c.innerHTML = '<div class="vacio">IG no está conectada. Conéctala en el botón 🏦 IG de la pantalla de inicio.</div>';
+    if (IG.cfg && IG.cfg.usr && IG.cfg.pwd && IG.cfg.key){ c.innerHTML = '<p class="sub">Conectando con IG…</p>'; try{ await igConectar(); }catch(e){ c.innerHTML = '<div class="vacio">No se pudo conectar con IG: ' + esc(e.message) + "</div>"; } }
+    return;
+  }
+  if (!c.querySelector(".igp")) c.innerHTML = '<p class="sub">Leyendo tus posiciones de IG…</p>';
+  await igPintaPos();
+}
+function pintaListaIG(pls){
+  const c = $("lPosIG"), cta = IG.cuenta ? (IG.cuenta.accountAlias || IG.cuenta.accountName || IG.cuenta.accountId) : "";
+  c.innerHTML = `<p class="sub">Cuenta <b style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">${igModo()}</b>${cta ? " · " + esc(cta) : ""}. Pulsa una posición para ver su gráfico.</p>`
+    + (IG.pos.length ? IG.pos.map((p, i) => igFila(p, pls ? pls[i] : null)).join("") : '<div class="vacio">No tienes posiciones abiertas en IG.</div>');
+  igBotonesCerrar(c);
+  c.querySelectorAll(".igp").forEach(d => { d.style.cursor = "pointer"; d.onclick = ev => { if (!ev.target.closest("button")) abrePosIG(d.dataset.id); }; });
+}
+// De una posición de IG al mercado de la app (ORO, EUR/USD…)
+function simDeIG(p){
+  const e = p.market.epic, n = (p.market.instrumentName || "").toLowerCase();
+  const r = Object.keys(IG.epics).find(s => IG.epics[s] === e); if (r) return r;
+  const m = e.match(/^CS\.D\.([A-Z]{6})\./);
+  if (m && MERCADOS.some(x => x[0] === m[1])) return m[1];
+  for (const [s, q] of Object.entries(IG_BUSCA)) if (n.includes(q.toLowerCase())) return s;
+  const f = [...favoritos(), ...buscados()].find(b => { const k = (b.nombre || "").toLowerCase(); return k && n && (n.includes(k) || k.includes(n)); });
+  return f ? f.sim : m ? m[1] : null;
+}
+function abrePosIG(id){
+  const p = IG.pos.find(x => x.position.dealId === id); if (!p) return;
+  const sim = simDeIG(p);
+  if (!sim){ toast("No sé qué mercado de la app es «" + (p.market.instrumentName || p.market.epic) + "». Búscalo en BUSCAR VALOR y márcalo como favorito.", 6000); return; }
+  if (IG.epics[sim] !== p.market.epic){ IG.epics[sim] = p.market.epic; store("bolsa_ig_epics", IG.epics); IG.simAct = null; }
+  abreGrafPos(sim, merDe(sim)[2], "ig");
+}
+// Dibuja en el gráfico las posiciones de IG de ese mercado: entrada (morada), SL (roja) y TP (verde), y flecha en la vela de entrada
+function igDibuja(ps){
+  if (!G || !G.serie) return;
+  const dat = G.serie.data(), ref = G.ultimo || (dat[dat.length - 1] || {}).close;
+  const key = ps.map(p => [p.position.dealId, p.position.level, p.position.stopLevel, p.position.limitLevel].join("|")).join(";");
+  if (IG.lin && IG.lin.serie === G.serie && IG.lin.key === key) return;
+  if (IG.lin && IG.lin.serie === G.serie) IG.lin.l.forEach(x => { try{ G.serie.removePriceLine(x); }catch(e){} });
+  if (!G.mkBase) G.mkBase = G.serie.markers ? G.serie.markers() : [];
+  const lin = [], mk = [];
+  for (const p of ps){
+    const x = p.position, compra = x.direction === "BUY", pr = v => igReal(igNum(v), ref);
+    const ent = pr(x.level); if (!(ent > 0)) continue;
+    lin.push(G.serie.createPriceLine({price: ent, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (compra ? "▲ COMPRA " : "▼ VENTA ") + String(x.size).replace(".", ",")}));
+    if (x.stopLevel) lin.push(G.serie.createPriceLine({price: pr(x.stopLevel), color: "#E5484D", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "SL"}));
+    if (x.limitLevel) lin.push(G.serie.createPriceLine({price: pr(x.limitLevel), color: "#2FBF71", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "TP"}));
+    const s = x.createdDateUTC || "", t = Date.parse(/Z$/.test(s) ? s : s + "Z");
+    if (t > 0){
+      const tE = aMadrid(t / 1000); let v = null;
+      for (const c of dat){ if (c.open == null) continue; if (c.time <= tE) v = c; else break; }
+      if (v) mk.push({time: v.time, position: compra ? "belowBar" : "aboveBar", color: "#C9A2FF", shape: compra ? "arrowUp" : "arrowDown", text: "IG", size: 1});
+    }
+  }
+  G.serie.setMarkers([...G.mkBase, ...mk].sort((a, b) => a.time - b.time));
+  IG.lin = {serie: G.serie, key, l: lin};
 }
 // En el gráfico: precio de IG en vivo y tus posiciones de IG de ese mercado
 function igPintaGraf(pls){
@@ -2460,6 +2566,7 @@ function igPintaGraf(pls){
   caja.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG ${igModo()}</span>${s ? " · " + s.bid + " / " + s.offer : ""} · precio de IG${IG.aviso ? ' · <b style="color:var(--rojo)">⚠ ' + IG.aviso + "</b>" : ""}` + l.map(([p, pl]) => igFila(p, pl)).join("");
   caja.style.display = "block";
   igBotonesCerrar(caja);
+  try{ igDibuja(l.map(([p]) => p)); marcaPosB(); }catch(e){}
 }
 // Cada 3 s con el gráfico abierto: precio de IG, actualiza la última vela; cada 15 s, las posiciones
 let igTick = 0;
@@ -2614,7 +2721,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.10-chfjpy";
+const APP_VERSION = "2026.11.11-posiciones";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
