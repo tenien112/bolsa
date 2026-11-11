@@ -1322,6 +1322,17 @@ async function pintaGuardado(v){
   }
 }
 
+// ¿GitHub no ha podido arrancar el vigilante? (sin minutos gratis o fallo al arrancar)
+const MSG_MIN = "GitHub no ha podido arrancarlo: sin minutos de GitHub Actions (o fallo al arrancar). Prueba más tarde.";
+async function falloArranque(wf, t0){
+  try{
+    const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${wf}/runs?per_page=5&t=${Date.now()}`, {headers:{Authorization:"Bearer " + store("bolsa_llave"), Accept:"application/vnd.github+json"}, cache:"no-store"});
+    if (!r.ok) return false;
+    const j = await r.json();
+    return (j.workflow_runs || []).some(x => Date.parse(x.created_at)/1000 >= t0 - 30 && x.conclusion === "startup_failure");
+  }catch(e){ return false; }
+}
+
 async function disparar(wf){
   await Promise.race([sincFavs(), new Promise(r => setTimeout(r, 8000))]);   // los radares leen tus favoritos: que estén al día
   const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${wf}/dispatches`, {
@@ -1350,6 +1361,7 @@ async function lanzar(v){
     const extra = s > 150 ? " · GitHub va con cola, sigo esperando" : "";
     estado(`Ejecutando en GitHub… ${s} s (suele tardar 1-2 min)${extra}`);
   }, 1000);
+  let nRev = 0;
   const revisar = async () => {
     if (actual !== v) return parar();
     try{
@@ -1364,6 +1376,7 @@ async function lanzar(v){
         }
       }
     }catch(e){}
+    if (++nRev % 3 === 0 && await falloArranque(v.wf, t0)){ parar(); estado(MSG_MIN, "mal"); $("resRepetir").hidden = false; return; }
     if (Date.now() - inicio > 6*60*1000){ parar(); estado("No ha llegado respuesta en 6 minutos. Prueba otra vez.", "mal"); $("resRepetir").hidden = false; }
   };
   sondeo = setInterval(revisar, 5000);
@@ -1441,6 +1454,7 @@ async function comunes(vr){
     const s = Math.round((Date.now() - inicio)/1000);
     estado2(`Ejecutando el radar y el bot en GitHub… ${s} s (suele tardar 1-2 min)${s > 150 ? " · GitHub va con cola, sigo esperando" : ""}`);
   }, 1000);
+  let nRev2 = 0;
   sondeo = setInterval(async () => {
     if (actual !== "comunes") return parar();
     try{
@@ -1456,6 +1470,7 @@ async function comunes(vr){
         return;
       }
     }catch(e){}
+    if (++nRev2 % 3 === 0 && (await falloArranque(V_RADAR.wf, t0) || await falloArranque(V_BOT.wf, t0))){ parar(); estado2(MSG_MIN, "mal"); $("comRepetir").hidden = false; return; }
     if (Date.now() - inicio > 6*60*1000){ parar(); estado2("No ha llegado respuesta en 6 minutos. Prueba otra vez.", "mal"); $("comRepetir").hidden = false; }
   }, 5000);
 }
@@ -2895,7 +2910,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-27";
+const APP_VERSION = "2026.11.11-28";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
