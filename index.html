@@ -2554,7 +2554,8 @@ function igDibuja(ps){
     const x = p.position, compra = x.direction === "BUY", pr = v => igReal(igNum(v), ref);
     const ent = pr(x.level); if (!(ent > 0)) continue;
     const f = igNum(x.level) / ent;   // precio de IG / precio del gráfico
-    lin.push(G.serie.createPriceLine({price: ent, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (compra ? "▲ COMPRA " : "▼ VENTA ") + String(x.size).replace(".", ",")}));
+    const lE = G.serie.createPriceLine({price: ent, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (compra ? "▲ COMPRA " : "▼ VENTA ") + String(x.size).replace(".", ",") + " ☰"});
+    lin.push(lE); h.push({t: "ent", l: lE, precio: ent, p, f, ent});
     if (x.stopLevel){ const l = G.serie.createPriceLine({price: pr(x.stopLevel), color: "#E5484D", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "SL ⇕"}); lin.push(l); h.push({t: "sl", l, precio: pr(x.stopLevel), p, f, ent}); }
     if (x.limitLevel){ const l = G.serie.createPriceLine({price: pr(x.limitLevel), color: "#2FBF71", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "TP ⇕"}); lin.push(l); h.push({t: "tp", l, precio: pr(x.limitLevel), p, f, ent}); }
     const s = x.createdDateUTC || "", t = Date.parse(/Z$/.test(s) ? s : s + "Z");
@@ -2607,6 +2608,43 @@ async function mvGuardar(){
     await igPintaPos();
   }catch(e){ toast("❌ IG: " + e.message, 6000); if ($("mvOk")){ $("mvOk").disabled = false; $("mvOk").textContent = "✅ GUARDAR EN IG"; } }
 }
+// ---------- Menú de una operación abierta: doblar, cambiar de sentido o cerrar ----------
+async function igOrden(cuerpo){
+  const r = await ig("/positions/otc", {metodo: "POST", version: "2", cuerpo});
+  let c = null;
+  for (let i = 0; i < 4 && !c; i++){ try{ c = await ig("/confirms/" + r.dealReference); }catch(e){ await new Promise(ok => setTimeout(ok, 700)); } }
+  if (!c) throw new Error("IG no confirma la orden: mira tus posiciones");
+  if (c.dealStatus !== "ACCEPTED") throw new Error(igErr(c.reason));
+  return c;
+}
+function posMenu(p){
+  if (TK) return;
+  const x = p.position, compra = x.direction === "BUY", nom = esc(p.market.instrumentName || ""), t = String(x.size).replace(".", ",");
+  const caja = $("gTk");
+  const pinta = (txt, accion) => {
+    caja.innerHTML = `<div class="fil"><span>${compra ? "▲ COMPRA" : "▼ VENTA"} ${nom} · tamaño ${t} · entrada ${x.level}${x.stopLevel ? " · SL " + x.stopLevel : ""}${x.limitLevel ? " · TP " + x.limitLevel : ""}</span></div>` +
+      (accion ? `<small>${txt}</small><div class="bt"><button class="no" id="pmNo">Volver</button><button class="ok c" id="pmOk">✅ SÍ, HACERLO</button></div>`
+      : `<div class="bt"><button class="ok l" id="pmDob">⧉ DOBLAR</button><button class="ok" id="pmGir" style="background:#6EB4F7;color:#0E1A14">⇄ CAMBIAR SENTIDO</button><button class="ok c" id="pmCer">✖ CERRAR</button></div><div class="bt"><button class="no" id="pmNo">Cancelar</button></div>`);
+    caja.style.display = "block";
+    $("pmNo").onclick = () => accion ? pinta() : (caja.style.display = "none", caja.innerHTML = "");
+    if (accion){ $("pmOk").onclick = async () => { const b = $("pmOk"); b.disabled = true; b.textContent = "Enviando…"; try{ await accion(); caja.style.display = "none"; caja.innerHTML = ""; }catch(e){ toast("❌ IG: " + e.message, 6000); pinta(); } await igPintaPos(); }; return; }
+    $("pmDob").onclick = () => pinta(`Abre otra ${compra ? "compra" : "venta"} de ${t} en ${nom} con el mismo stop loss y take profit. Quedarás con el doble.`, async () => {
+      const c = await igOrden({epic: p.market.epic, expiry: p.market.expiry || "-", direction: x.direction, size: igNum(x.size), orderType: "MARKET", currencyCode: x.currency, forceOpen: true, guaranteedStop: false,
+        stopLevel: x.stopLevel != null ? igNum(x.stopLevel) : undefined, limitLevel: x.limitLevel != null ? igNum(x.limitLevel) : undefined});
+      toast("✅ IG: posición doblada a " + igNum(c.level), 5000);
+    });
+    $("pmGir").onclick = () => pinta(`Cierra esta ${compra ? "compra" : "venta"} y abre una ${compra ? "VENTA" : "COMPRA"} de ${t} en ${nom}, con el stop loss y el take profit a la misma distancia que tenías.`, async () => {
+      const d = await igDetalle(p.market.epic), lv = igNum(x.level);
+      const dS = x.stopLevel != null ? Math.round(igPts(Math.abs(lv - igNum(x.stopLevel)), lv, d) * 10) / 10 : undefined;
+      const dT = x.limitLevel != null ? Math.round(igPts(Math.abs(igNum(x.limitLevel) - lv), lv, d) * 10) / 10 : undefined;
+      await igCerrar(p);
+      const c = await igOrden({epic: p.market.epic, expiry: p.market.expiry || "-", direction: compra ? "SELL" : "BUY", size: igNum(x.size), orderType: "MARKET", currencyCode: x.currency, forceOpen: true, guaranteedStop: false, stopDistance: dS, limitDistance: dT});
+      toast("✅ IG: ahora en " + (compra ? "VENTA" : "COMPRA") + " a " + igNum(c.level), 5000);
+    });
+    $("pmCer").onclick = () => pinta(`Cierra esta ${compra ? "compra" : "venta"} de ${t} en ${nom} al precio de ahora.`, async () => { await igCerrar(p); });
+  };
+  pinta();
+}
 (() => {
   const caja = $("gCaja"); let arr = null;
   const yDe = e => e.clientY - caja.getBoundingClientRect().top;
@@ -2615,6 +2653,7 @@ async function mvGuardar(){
     const y = yDe(e); let mej = null, dm = 18;
     for (const h of IG.lin.h){ const yy = G.serie.priceToCoordinate(MV && MV.h === h ? MV.nuevo : h.precio); if (yy != null && Math.abs(y - yy) < dm){ dm = Math.abs(y - yy); mej = h; } }
     if (!mej) return;
+    if (mej.t === "ent"){ if (MV) mvFuera(true); posMenu(mej.p); e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (MV && MV.h !== mej) mvFuera(true);
     arr = mej; G.chart.applyOptions({handleScroll: false, handleScale: false});
     try{ caja.setPointerCapture(e.pointerId); }catch(err){}
@@ -2802,7 +2841,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-22";
+const APP_VERSION = "2026.11.11-23";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
