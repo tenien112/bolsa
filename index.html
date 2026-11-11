@@ -2544,15 +2544,17 @@ function igDibuja(ps){
   const dat = G.serie.data(), ref = G.ultimo || (dat[dat.length - 1] || {}).close;
   const key = ps.map(p => [p.position.dealId, p.position.level, p.position.stopLevel, p.position.limitLevel].join("|")).join(";");
   if (IG.lin && IG.lin.serie === G.serie && IG.lin.key === key) return;
+  if (MV) return;
   if (IG.lin && IG.lin.serie === G.serie) IG.lin.l.forEach(x => { try{ G.serie.removePriceLine(x); }catch(e){} });
   if (!G.mkBase) G.mkBase = G.serie.markers ? G.serie.markers() : [];
-  const lin = [], mk = [];
+  const lin = [], mk = [], h = [];
   for (const p of ps){
     const x = p.position, compra = x.direction === "BUY", pr = v => igReal(igNum(v), ref);
     const ent = pr(x.level); if (!(ent > 0)) continue;
+    const f = igNum(x.level) / ent;   // precio de IG / precio del gráfico
     lin.push(G.serie.createPriceLine({price: ent, color: "#C9A2FF", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: (compra ? "▲ COMPRA " : "▼ VENTA ") + String(x.size).replace(".", ",")}));
-    if (x.stopLevel) lin.push(G.serie.createPriceLine({price: pr(x.stopLevel), color: "#E5484D", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "SL"}));
-    if (x.limitLevel) lin.push(G.serie.createPriceLine({price: pr(x.limitLevel), color: "#2FBF71", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "TP"}));
+    if (x.stopLevel){ const l = G.serie.createPriceLine({price: pr(x.stopLevel), color: "#E5484D", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "SL ⇕"}); lin.push(l); h.push({t: "sl", l, precio: pr(x.stopLevel), p, f, ent}); }
+    if (x.limitLevel){ const l = G.serie.createPriceLine({price: pr(x.limitLevel), color: "#2FBF71", lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: "TP ⇕"}); lin.push(l); h.push({t: "tp", l, precio: pr(x.limitLevel), p, f, ent}); }
     const s = x.createdDateUTC || "", t = Date.parse(/Z$/.test(s) ? s : s + "Z");
     if (t > 0){
       const tE = aMadrid(t / 1000); let v = null;
@@ -2561,8 +2563,74 @@ function igDibuja(ps){
     }
   }
   G.serie.setMarkers([...G.mkBase, ...mk].sort((a, b) => a.time - b.time));
-  IG.lin = {serie: G.serie, key, l: lin};
+  IG.lin = {serie: G.serie, key, l: lin, h};
 }
+// ---------- Mover el SL / TP de una operación abierta arrastrando su línea ----------
+let MV = null;   // {h, nuevo}
+function mvFuera(volver){
+  if (MV && volver){ try{ MV.h.l.applyOptions({price: MV.h.precio, title: MV.h.t.toUpperCase() + " ⇕"}); }catch(e){} }
+  MV = null; if (!TK){ $("gTk").style.display = "none"; $("gTk").innerHTML = ""; }
+}
+async function mvPanel(){
+  if (!MV) return;
+  const {h, nuevo} = MV, x = h.p.position, compra = x.direction === "BUY";
+  let eur = "";
+  try{
+    const d = await igDetalle(h.p.market.epic), eurP = igNum(x.size) * d.vPip / await igEurA(d.cur);
+    if (d.pip > 0){ const v = (compra ? nuevo - h.ent : h.ent - nuevo) / d.pip * eurP; eur = " (" + fE(v) + ")"; h.l.applyOptions({title: h.t.toUpperCase() + " " + fE(v)}); }
+  }catch(e){}
+  if (!MV) return;
+  const dec = h.ent < 10 ? 5 : h.ent < 300 ? 3 : 2;
+  $("gTk").innerHTML = `<div class="fil"><span>${compra ? "▲" : "▼"} ${esc(h.p.market.instrumentName || "")} · tamaño ${String(x.size).replace(".", ",")}</span>
+    <span style="color:${h.t === "sl" ? "var(--rojo)" : "var(--verde)"}">Nuevo ${h.t === "sl" ? "stop loss" : "take profit"}: <b>${nuevo.toFixed(dec)}</b>${eur}</span><span>antes ${h.precio.toFixed(dec)}</span></div>
+    <div class="bt"><button class="no" id="mvNo">Dejarlo como estaba</button><button class="ok ${h.t === "sl" ? "c" : "l"}" id="mvOk">✅ GUARDAR EN IG</button></div>`;
+  $("mvNo").onclick = () => mvFuera(true); $("mvOk").onclick = mvGuardar;
+  $("gTk").style.display = "block";
+}
+async function mvGuardar(){
+  if (!MV) return;
+  const {h, nuevo} = MV, x = h.p.position, b = $("mvOk"); b.disabled = true; b.textContent = "Guardando…";
+  try{
+    const decs = v => ((String(v).split(".")[1]) || "").length;
+    const snap = (IG.mer[h.p.market.epic] || {}).snap || {};
+    const dd = Math.max(decs(x.level), decs(snap.bid), decs(x.stopLevel), decs(x.limitLevel));
+    const raw = +(nuevo * h.f).toFixed(dd);
+    const cuerpo = {stopLevel: h.t === "sl" ? raw : (x.stopLevel != null ? igNum(x.stopLevel) : null), limitLevel: h.t === "tp" ? raw : (x.limitLevel != null ? igNum(x.limitLevel) : null), trailingStop: false};
+    const r = await ig("/positions/otc/" + encodeURIComponent(x.dealId), {metodo: "PUT", version: "2", cuerpo});
+    let c = null;
+    for (let i = 0; i < 4 && !c; i++){ try{ c = await ig("/confirms/" + r.dealReference); }catch(e){ await new Promise(ok => setTimeout(ok, 700)); } }
+    if (c && c.dealStatus !== "ACCEPTED") throw new Error(igErr(c.reason));
+    toast("✅ " + (h.t === "sl" ? "Stop loss" : "Take profit") + " cambiado en IG a " + raw, 4000);
+    MV = null; $("gTk").style.display = "none"; $("gTk").innerHTML = "";
+    await igPintaPos();
+  }catch(e){ toast("❌ IG: " + e.message, 6000); if ($("mvOk")){ $("mvOk").disabled = false; $("mvOk").textContent = "✅ GUARDAR EN IG"; } }
+}
+(() => {
+  const caja = $("gCaja"); let arr = null;
+  const yDe = e => e.clientY - caja.getBoundingClientRect().top;
+  caja.addEventListener("pointerdown", e => {
+    if (TK || !G || !IG.lin || IG.lin.serie !== G.serie || !(IG.lin.h || []).length) return;
+    const y = yDe(e); let mej = null, dm = 18;
+    for (const h of IG.lin.h){ const yy = G.serie.priceToCoordinate(MV && MV.h === h ? MV.nuevo : h.precio); if (yy != null && Math.abs(y - yy) < dm){ dm = Math.abs(y - yy); mej = h; } }
+    if (!mej) return;
+    if (MV && MV.h !== mej) mvFuera(true);
+    arr = mej; G.chart.applyOptions({handleScroll: false, handleScale: false});
+    try{ caja.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
+  caja.addEventListener("pointermove", e => {
+    if (!arr || !G) return;
+    let pz = G.serie.coordinateToPrice(yDe(e)); if (pz == null) return;
+    const compra = arr.p.position.direction === "BUY", ahora = G.ultimo || arr.ent;
+    // El SL tiene que quedar por debajo del precio actual en una compra (por encima en una venta); el TP, al revés
+    if (arr.t === "sl") pz = compra ? Math.min(pz, ahora * 0.9999) : Math.max(pz, ahora * 1.0001);
+    else pz = compra ? Math.max(pz, ahora * 1.0001) : Math.min(pz, ahora * 0.9999);
+    MV = {h: arr, nuevo: pz}; arr.l.applyOptions({price: pz});
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
+  const suelta = () => { if (!arr) return; arr = null; if (G && G.chart) G.chart.applyOptions({handleScroll: true, handleScale: true}); if (MV) mvPanel(); };
+  caja.addEventListener("pointerup", suelta, true); caja.addEventListener("pointercancel", suelta, true);
+})();
 // En el gráfico: precio de IG en vivo y tus posiciones de IG de ese mercado
 function igPintaGraf(pls){
   const caja = $("gIG");
@@ -2728,7 +2796,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-ficticio";
+const APP_VERSION = "2026.11.11-20";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
