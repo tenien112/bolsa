@@ -118,7 +118,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px;line-he
 .cambio small{display:block;font:500 13px Archivo,sans-serif;color:var(--mut);margin-bottom:2px}
 #graf{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;padding:max(12px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom))}
 #graf.on{display:flex}
-#igBar{position:fixed;top:0;left:0;right:0;z-index:30;display:none;justify-content:center;gap:min(14px,2vw);padding:calc(env(safe-area-inset-top) + 2px) 4px 2px;background:var(--velo);border-bottom:1px solid var(--line);font:700 min(11px,2.5vw) "JetBrains Mono",monospace;color:var(--mut);white-space:nowrap;overflow:hidden}
+#igBar{position:fixed;top:0;left:0;right:0;z-index:30;display:none;justify-content:safe center;gap:min(10px,1.6vw);padding:calc(env(safe-area-inset-top) + 2px) 4px 2px;background:var(--velo);border-bottom:1px solid var(--line);font:700 min(11px,2.5vw) "JetBrains Mono",monospace;color:var(--mut);white-space:nowrap;overflow:hidden}
 #igBar b{color:var(--txt)}#igBar .g{color:var(--verde)}#igBar .p{color:var(--rojo)}
 body.conIG{padding-top:calc(max(16px,env(safe-area-inset-top)) + 20px)}
 body.conIG #graf,body.conIG #hoja,body.conIG #posF{top:calc(env(safe-area-inset-top) + 19px)}
@@ -2318,9 +2318,15 @@ function igBarra(){
   const pl = +b.profitLoss || 0;
   el.innerHTML = `<span style="color:${IG.cfg.real ? "var(--rojo)" : "var(--verde)"}">● IG</span><span>Saldo <b>${f(b.balance)} €</b></span><span>Abierto <b class="${pl > 0 ? "g" : pl < 0 ? "p" : ""}">${pl >= 0 ? "+" : "−"}${f(Math.abs(pl))} €</b></span><span>Margen <b>${f(b.deposit)} €</b></span><span>Disp. <b>${f(b.available)} €</b></span>`;
   el.style.display = "flex"; document.body.classList.add("conIG");
-  el.style.fontSize = ""; let fs = parseFloat(getComputedStyle(el).fontSize);
-  while (el.scrollWidth > el.clientWidth && fs > 7){ fs -= 0.5; el.style.fontSize = fs + "px"; }
+  // Que quepa entera en una línea: se mide el contenido real y se reduce la letra lo necesario
+  el.style.justifyContent = "flex-start"; el.style.fontSize = "";
+  let fs = parseFloat(getComputedStyle(el).fontSize);
+  const ancho = () => [...el.children].reduce((a, c) => a + c.offsetWidth, 0) + parseFloat(getComputedStyle(el).columnGap || 0) * (el.children.length - 1) + 8;
+  while (ancho() > el.clientWidth && fs > 6){ fs -= 0.5; el.style.fontSize = fs + "px"; }
+  el.style.justifyContent = "";
 }
+addEventListener("resize", () => { if (document.body.classList.contains("conIG")) igBarra(); });
+if (document.fonts) document.fonts.ready.then(() => { if (document.body.classList.contains("conIG")) igBarra(); });
 // Cada 20 s (con la app a la vista) se refresca el saldo de IG
 setInterval(async () => {
   if (!igListo() || document.visibilityState !== "visible") return;
@@ -2910,7 +2916,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-28";
+const APP_VERSION = "2026.11.11-29";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
