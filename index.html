@@ -142,7 +142,7 @@ body.conIG #graf,body.conIG #hoja,body.conIG #posF{top:calc(env(safe-area-inset-
 #graf.solo #gOp,#graf.solo #gIG,#graf.solo #gNota{display:none!important}
 #gSolo.on{background:var(--oro);color:#0E1A14}
 #ctxM{position:fixed;z-index:60;display:flex;align-items:center;gap:4px;padding:4px;background:var(--panel);border:1px solid var(--oro);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.45);font:700 12px Archivo,sans-serif;color:var(--txt)}
-#ctxM button{width:32px;height:30px;border:0;border-radius:7px;font:900 16px Archivo,sans-serif;cursor:pointer;color:#fff}
+#ctxM button{min-width:32px;height:34px;padding:0 8px;white-space:nowrap;border:0;border-radius:7px;font:900 13px Archivo,sans-serif;cursor:pointer;color:#fff}
 #ctxM .dob,#ctxM .si{background:var(--verde);color:#0E1A14}#ctxM .gir{background:var(--azul);color:#0E1A14}#ctxM .cer,#ctxM .no{background:var(--rojo)}
 #ctxM span{padding:0 4px;white-space:nowrap}
 #gOrig{font:700 12px Archivo,sans-serif;margin:2px 0 4px;padding:3px 8px;border-radius:8px;align-self:flex-start;background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
@@ -205,6 +205,9 @@ body.conIG #graf,body.conIG #hoja,body.conIG #posF{top:calc(env(safe-area-inset-
 .igp{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:6px 0;font-size:14px}
 .igp .t{flex:1}.igp small{display:block;color:var(--mut);font-size:12px}.igp .g{color:var(--verde)}.igp .p{color:var(--rojo)}
 .igp button{background:var(--rojo);color:#fff;border:0;border-radius:8px;padding:6px 10px;font:900 12px Archivo,sans-serif;cursor:pointer}
+.igp button.mini{background:transparent;border:1px solid var(--line);color:var(--mut);font:700 10px "JetBrains Mono",monospace;padding:2px 5px;border-radius:6px}
+.igp button.mini.sl{color:var(--rojo)}.igp button.mini.tp{color:var(--verde)}
+.igp button.acc{background:var(--azul);color:#0E1A14;font-size:16px;padding:4px 12px;line-height:1}
 #igCta{width:100%;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:700 14px Archivo,sans-serif;margin:4px 0}
 #igCos table{width:100%;border-collapse:collapse;font:700 12px "JetBrains Mono",monospace;margin:6px 0}#igCos th,#igCos td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right}#igCos th:first-child,#igCos td:first-child{text-align:left}#igCos th{color:var(--mut);font-size:11px}#igCos .mej{color:var(--verde)}
 #gIG{display:none;font:700 11px "JetBrains Mono",monospace;color:var(--mut);margin-top:4px}
@@ -2644,10 +2647,18 @@ async function igPL(p){
 }
 const igFila = (p, pl) => {
   const x = p.position, c = pl == null ? "" : pl >= 0 ? "g" : "p";
-  return `<div class="igp" data-id="${esc(x.dealId)}"><div class="t">${x.direction === "BUY" ? "▲" : "▼"} ${esc(p.market.instrumentName || p.market.epic)} <b class="${c}">${pl == null ? "" : (pl >= 0 ? "+" : "−") + Math.abs(pl).toFixed(2).replace(".", ",") + " €"}</b><small>Tamaño ${String(x.size).replace(".", ",")} · entrada ${x.level}${x.stopLevel ? " · SL " + x.stopLevel : ""}${x.limitLevel ? " · TP " + x.limitLevel : ""}</small></div><button>CERRAR</button></div>`;
+  return `<div class="igp" data-id="${esc(x.dealId)}"><div class="t">${x.direction === "BUY" ? "▲" : "▼"} ${esc(p.market.instrumentName || p.market.epic)} <b class="${c}">${pl == null ? "" : (pl >= 0 ? "+" : "−") + Math.abs(pl).toFixed(2).replace(".", ",") + " €"}</b><small>Tamaño ${String(x.size).replace(".", ",")} · entrada ${x.level}${x.stopLevel ? " · SL " + x.stopLevel : ""}${x.limitLevel ? " · TP " + x.limitLevel : ""}</small></div>${x.stopLevel ? "" : '<button class="mini sl" data-t="sl" title="Poner stop loss">+SL</button>'}${x.limitLevel ? "" : '<button class="mini tp" data-t="tp" title="Poner take profit">+TP</button>'}<button class="acc" title="Duplicar, cambiar de sentido o cerrar">⋯</button><button>CERRAR</button></div>`;
 };
 function igBotonesCerrar(caja){
-  caja.querySelectorAll(".igp button").forEach(b => b.onclick = async e => {
+  // Botón ⋯: menú con doblar, cambiar de sentido y cerrar
+  caja.querySelectorAll(".igp button.acc").forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const p = IG.pos.find(x => x.position.dealId === b.closest(".igp").dataset.id); if (!p) return;
+    const r = b.getBoundingClientRect(); posCtx(p, r.left - 60, r.bottom + 6);
+  });
+  // +SL / +TP: pone una línea en el gráfico para arrastrarla y guardarla en IG
+  caja.querySelectorAll(".igp button.mini").forEach(b => b.onclick = e => { e.stopPropagation(); igPonSLTP(b.closest(".igp").dataset.id, b.dataset.t); });
+  caja.querySelectorAll(".igp button:not(.acc):not(.mini)").forEach(b => b.onclick = async e => {
     e.stopPropagation();
     const p = IG.pos.find(x => x.position.dealId === b.closest(".igp").dataset.id); if (!p) return;
     if (!b.dataset.seguro){ b.dataset.seguro = 1; b.textContent = "¿SEGURO?"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "CERRAR"; } }, 4000); return; }
@@ -2734,11 +2745,40 @@ function igDibuja(ps){
   }
   G.serie.setMarkers([...G.mkBase, ...mk].sort((a, b) => a.time - b.time));
   IG.lin = {serie: G.serie, key, l: lin, h};
+  if (IG.pendSL){ const q = IG.pendSL; IG.pendSL = null; setTimeout(() => igPonSLTP(q.id, q.t, true), 300); }
+}
+// Euros por unidad de precio de una posición, para ir viendo en la línea lo que ganas o pierdes mientras la mueves
+async function igEurLinea(h){
+  if (h.eurP) return;
+  try{ const x = h.p.position, d = await igDetalle(h.p.market.epic); if (d.pip > 0) h.eurP = igNum(x.size) * d.vPip / await igEurA(d.cur) / d.pip; }catch(e){}
+}
+function igTitLinea(h, pz){
+  if (!h.eurP) return h.t.toUpperCase() + " ⇕";
+  const v = (h.p.position.direction === "BUY" ? pz - h.ent : h.ent - pz) * h.eurP;
+  return h.t.toUpperCase() + " " + fE(v);
+}
+// Poner un SL o TP a una posición que no lo tiene: sale una línea a 2 velas medias de la entrada, la arrastras y GUARDAR EN IG
+function igPonSLTP(id, t, ya){
+  const eH = IG.lin && G && IG.lin.serie === G.serie ? (IG.lin.h || []).find(h => h.t === "ent" && h.p.position.dealId === id) : null;
+  if (!eH){ if (ya) return; IG.pendSL = {id, t}; abrePosIG(id); return; }
+  if (MV) mvFuera(true);
+  const compra = eH.p.position.direction === "BUY", ahora = G.ultimo || eH.ent;
+  const vs = G.serie.data().slice(-14).filter(v => v.high != null);
+  const dist = vs.length ? vs.reduce((a, v) => a + (v.high - v.low), 0) / vs.length * 2 : ahora * 0.005;
+  let pz = (t === "sl") === compra ? eH.ent - dist : eH.ent + dist;
+  if (t === "sl") pz = compra ? Math.min(pz, ahora * 0.9999) : Math.max(pz, ahora * 1.0001);
+  else pz = compra ? Math.max(pz, ahora * 1.0001) : Math.min(pz, ahora * 0.9999);
+  const l = G.serie.createPriceLine({price: pz, color: t === "sl" ? "#E5484D" : "#2FBF71", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: t.toUpperCase() + " ⇕"});
+  const h = {t, l, precio: pz, p: eH.p, f: eH.f, ent: eH.ent, nuevo: true};
+  IG.lin.l.push(l); IG.lin.h.push(h);
+  MV = {h, nuevo: pz}; mvPanel(); igEurLinea(h).then(() => { try{ l.applyOptions({title: igTitLinea(h, MV && MV.h === h ? MV.nuevo : pz)}); }catch(e){} });
+  toast("Arrastra la línea " + (t === "sl" ? "roja" : "verde") + " y pulsa GUARDAR EN IG", 3500);
 }
 // ---------- Mover el SL / TP de una operación abierta arrastrando su línea ----------
 let MV = null;   // {h, nuevo}
 function mvFuera(volver){
-  if (MV && volver){ try{ MV.h.l.applyOptions({price: MV.h.precio, title: MV.h.t.toUpperCase() + " ⇕"}); }catch(e){} }
+  if (MV && volver && MV.h.nuevo){ try{ G.serie.removePriceLine(MV.h.l); }catch(e){} if (IG.lin){ IG.lin.h = IG.lin.h.filter(x => x !== MV.h); IG.lin.l = IG.lin.l.filter(x => x !== MV.h.l); } }
+  else if (MV && volver){ try{ MV.h.l.applyOptions({price: MV.h.precio, title: MV.h.t.toUpperCase() + " ⇕"}); }catch(e){} }
   MV = null; if (!TK){ $("gTk").style.display = "none"; $("gTk").innerHTML = ""; }
 }
 async function mvPanel(){
@@ -2752,8 +2792,8 @@ async function mvPanel(){
   if (!MV) return;
   const dec = h.ent < 10 ? 5 : h.ent < 300 ? 3 : 2;
   $("gTk").innerHTML = `<div class="fil"><span>${compra ? "▲" : "▼"} ${esc(h.p.market.instrumentName || "")} · tamaño ${String(x.size).replace(".", ",")}</span>
-    <span style="color:${h.t === "sl" ? "var(--rojo)" : "var(--verde)"}">Nuevo ${h.t === "sl" ? "stop loss" : "take profit"}: <b>${nuevo.toFixed(dec)}</b>${eur}</span><span>antes ${h.precio.toFixed(dec)}</span></div>
-    <div class="bt"><button class="no" id="mvNo">Dejarlo como estaba</button><button class="ok ${h.t === "sl" ? "c" : "l"}" id="mvOk">✅ GUARDAR EN IG</button></div>`;
+    <span style="color:${h.t === "sl" ? "var(--rojo)" : "var(--verde)"}">Nuevo ${h.t === "sl" ? "stop loss" : "take profit"}: <b>${nuevo.toFixed(dec)}</b>${eur}</span><span>${h.nuevo ? "ahora sin " + h.t.toUpperCase() : "antes " + h.precio.toFixed(dec)}</span></div>
+    <div class="bt"><button class="no" id="mvNo">${h.nuevo ? "Cancelar" : "Dejarlo como estaba"}</button><button class="ok ${h.t === "sl" ? "c" : "l"}" id="mvOk">✅ GUARDAR EN IG</button></div>`;
   $("mvNo").onclick = () => mvFuera(true); $("mvOk").onclick = mvGuardar;
   $("gTk").style.display = "block";
 }
@@ -2786,11 +2826,11 @@ async function igOrden(cuerpo){
 }
 // Acciones sobre una operación abierta
 const POS_ACC = {
-  dob: {ic: "⧉", nom: "Doblar", txt: (p, c) => `¿Abrir otra ${c ? "compra" : "venta"} igual?`, f: async p => {
+  dob: {ic: "⧉", nom: "Duplicar", txt: (p, c) => `¿Abrir otra ${c ? "compra" : "venta"} igual?`, f: async p => {
     const x = p.position;
     const c = await igOrden({epic: p.market.epic, expiry: p.market.expiry || "-", direction: x.direction, size: igNum(x.size), orderType: "MARKET", currencyCode: x.currency, forceOpen: true, guaranteedStop: false,
       stopLevel: x.stopLevel != null ? igNum(x.stopLevel) : undefined, limitLevel: x.limitLevel != null ? igNum(x.limitLevel) : undefined});
-    toast("✅ IG: posición doblada a " + igNum(c.level), 5000);
+    toast("✅ IG: posición duplicada a " + igNum(c.level), 5000);
   }},
   gir: {ic: "⇄", nom: "Cambiar sentido", txt: (p, c) => `¿Cerrar y abrir ${c ? "VENTA" : "COMPRA"}?`, f: async p => {
     const x = p.position, compra = x.direction === "BUY", d = await igDetalle(p.market.epic), lv = igNum(x.level);
@@ -2810,7 +2850,7 @@ function posCtx(p, cx, cy){
   const compra = p.position.direction === "BUY";
   const coloca = () => { const r = m.getBoundingClientRect(); m.style.left = Math.max(4, Math.min(cx, innerWidth - r.width - 4)) + "px"; m.style.top = Math.max(4, Math.min(cy, innerHeight - r.height - 4)) + "px"; };
   const iconos = () => {
-    m.innerHTML = Object.entries(POS_ACC).map(([k, a]) => `<button data-k="${k}" title="${a.nom}" class="${k}">${a.ic}</button>`).join("");
+    m.innerHTML = Object.entries(POS_ACC).map(([k, a]) => `<button data-k="${k}" title="${a.nom}" class="${k}">${a.ic} ${a.nom.toUpperCase()}</button>`).join("");
     m.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); confirma(b.dataset.k); });
     coloca();
   };
@@ -2838,11 +2878,15 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") ctxFuera(); 
     for (const h of IG.lin.h){ const yy = G.serie.priceToCoordinate(MV && MV.h === h ? MV.nuevo : h.precio); if (yy != null && Math.abs(y - yy) < dm){ dm = Math.abs(y - yy); mej = h; } }
     if (!mej) return;
     if (mej.t === "ent"){
-      if (e.pointerType === "touch"){ const cx = e.clientX, cy = e.clientY; clearTimeout(caja._lp); caja._lp = setTimeout(() => posCtx(mej.p, cx, cy), 600); }
+      if (e.pointerType === "touch"){
+        const cx = e.clientX, cy = e.clientY; clearTimeout(caja._lp);
+        caja._tq = {p: mej.p, x: cx, y: cy, t: Date.now()};
+        caja._lp = setTimeout(() => { caja._tq = null; posCtx(mej.p, cx, cy + 14); }, 500);
+      }
       return;   // el botón derecho lo trata «contextmenu»
     }
     if (MV && MV.h !== mej) mvFuera(true);
-    arr = mej; G.chart.applyOptions({handleScroll: false, handleScale: false});
+    arr = mej; G.chart.applyOptions({handleScroll: false, handleScale: false}); igEurLinea(mej);
     try{ caja.setPointerCapture(e.pointerId); }catch(err){}
     e.preventDefault(); e.stopImmediatePropagation();
   }, true);
@@ -2853,11 +2897,15 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") ctxFuera(); 
     // El SL tiene que quedar por debajo del precio actual en una compra (por encima en una venta); el TP, al revés
     if (arr.t === "sl") pz = compra ? Math.min(pz, ahora * 0.9999) : Math.max(pz, ahora * 1.0001);
     else pz = compra ? Math.max(pz, ahora * 1.0001) : Math.min(pz, ahora * 0.9999);
-    MV = {h: arr, nuevo: pz}; arr.l.applyOptions({price: pz});
+    MV = {h: arr, nuevo: pz}; arr.l.applyOptions({price: pz, title: igTitLinea(arr, pz)});
     e.preventDefault(); e.stopImmediatePropagation();
   }, true);
-  caja.addEventListener("pointerup", () => clearTimeout(caja._lp), true);
-  caja.addEventListener("pointermove", () => clearTimeout(caja._lp), true);
+  caja.addEventListener("pointerup", e => {
+    clearTimeout(caja._lp); const q = caja._tq; caja._tq = null;
+    if (q && Math.hypot(e.clientX - q.x, e.clientY - q.y) < 14 && Date.now() - q.t < 800) setTimeout(() => posCtx(q.p, q.x, q.y + 14), 30);
+  }, true);
+  caja.addEventListener("pointercancel", () => { clearTimeout(caja._lp); caja._tq = null; }, true);
+  caja.addEventListener("pointermove", e => { const q = caja._tq; if (q && Math.hypot(e.clientX - q.x, e.clientY - q.y) > 14){ clearTimeout(caja._lp); caja._tq = null; } }, true);
   caja.addEventListener("contextmenu", e => {
     if (!G || !IG.lin || IG.lin.serie !== G.serie) return;
     const y = yDe(e); let mej = null, dm = 14;
@@ -3053,7 +3101,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-4";
+const APP_VERSION = "2026.11.12-6";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
