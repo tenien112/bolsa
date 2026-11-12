@@ -233,6 +233,12 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 .seg button.on.c{background:var(--rojo);color:#fff;border-color:var(--rojo)}
 .dos{display:flex;gap:8px}.dos>div{flex:1}
 .mini{background:none;border:0;color:var(--oro);font:700 13px Archivo,sans-serif;cursor:pointer;padding:2px 0}
+.posres{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;display:none}
+.posres .f{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:3px 0}
+.posres .f span{font:600 14px Archivo,sans-serif;color:var(--mut)}
+.posres .f b{font:900 20px "JetBrains Mono",monospace}
+.posres .f b.g{color:var(--verde)}.posres .f b.p{color:var(--rojo)}
+.posres small{display:block;color:var(--mut);font-size:11px;margin-top:4px}
 .posi{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--verde);border-radius:16px;padding:14px;margin-bottom:12px}
 .posi.c{border-left-color:var(--rojo)}
 .posi .t{font:900 18px Archivo,sans-serif}
@@ -402,6 +408,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <button class="volver" data-ir="pPosMenu">← Volver</button>
   <h2>📝 MIS POSICIONES FICTICIAS</h2>
   <p class="sub">Las posiciones que apuntes aquí (las que abres en XTB o cTrader). Se ven también dibujadas en el gráfico de la app. Se guardan en este móvil.</p>
+  <div id="posRes" class="posres"></div>
   <div id="lPos"></div>
   <button class="btn" id="posNueva">➕ Apuntar una posición</button>
   <button class="btn sec" id="posHis" style="margin-top:10px">📜 Historial: posiciones cerradas</button>
@@ -1579,8 +1586,64 @@ async function abreGrafPos(sim, tv, modo, idx, tf){
   if (!$("graf").classList.contains("on")) abreCapa();
   abreGraf(sim, tf || "60", cambio, merDe(sim)[1] + " · H1", R.tfs, {i: idx, cambia: (k, t) => abreGrafPos(sim, tv, modo, k, t)});
 }
+// Quita posiciones repetidas (mismo mercado, sentido, lote y entrada apuntadas con menos de 10 s de diferencia)
+function quitaDobles(){
+  const l = posiciones(), q = [];
+  for (const p of l) if (!q.some(x => x.sim === p.sim && x.dir === p.dir && x.lote === p.lote && x.precio === p.precio && Math.abs(x.hora - p.hora) < 10)) q.push(p);
+  if (q.length !== l.length) guardaPos(q);
+  return q;
+}
+// Apalancamiento minorista de XTB (normas ESMA) para estimar el margen
+const MAYORES = ["USD","EUR","JPY","GBP","CAD","CHF"];
+function apal(sim){
+  if (sim === "XAUUSD") return 20;
+  if (/^(XAG|XPT|XPD)USD$|^USOIL$/.test(sim)) return 10;
+  if (/^(BTC|ETH)USD$/.test(sim)) return 2;
+  if (/^[A-Z]{6}$/.test(sim)) return MAYORES.includes(sim.slice(0,3)) && MAYORES.includes(sim.slice(3)) ? 30 : 20;
+  return 5;
+}
+// Pasa una cantidad en cualquier divisa a euros con los últimos precios guardados
+const _px = {};
+async function px(sim){ if (!(sim in _px)){ try{ const u = await ultimoPrecio(sim); _px[sim] = u ? u.precio : null; }catch(e){ _px[sim] = null; } } return _px[sim]; }
+async function aEUR(v, mon){
+  if (v == null) return null;
+  if (mon === "EUR") return v;
+  let usd = v;
+  if (mon !== "USD"){
+    const a = await px("USD" + mon); if (a) usd = v / a;
+    else { const b = await px(mon + "USD"); if (b) usd = v * b; else { const c = await px("EUR" + mon); return c ? v / c : null; } }
+  }
+  const e = await px("EURUSD"); return e ? usd / e : null;
+}
+// Margen estimado en euros de una posición (valor nominal / apalancamiento)
+async function margenEUR(p, precio){
+  const t = tamLote(p.sim); if (!t || p.lote == null) return null;
+  const nom = t * p.lote, base = /^[A-Z]{6}$/.test(p.sim) && !TAM_LOTE[p.sim] ? p.sim.slice(0,3) : null;
+  const eur = base ? await aEUR(nom, base) : await aEUR(nom * precio, "USD");
+  return eur == null ? null : eur / apal(p.sim);
+}
+const fEur = (v, sg) => (sg ? (v >= 0 ? "+" : "−") : "") + Math.abs(v).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €";
+async function pintaResumen(l, precios){
+  const c = $("posRes");
+  let gan = 0, mar = 0, falta = 0;
+  for (const p of l){
+    const pr = precios[p.sim]; if (pr == null){ falta++; continue; }
+    const d = dinero(p, pr), g = d ? await aEUR(d.v, d.m) : null, m = await margenEUR(p, pr);
+    if (g == null || m == null){ falta++; continue; }
+    gan += g; mar += m;
+  }
+  let cer = 0;
+  for (const h of (store("bolsa_cerradas") || [])){ if (h.dinero == null) continue; const v = await aEUR(h.dinero, h.mon || "USD"); if (v != null) cer += v; }
+  c.innerHTML = `<div class="f"><span>Ganancia abierta (${l.length})</span><b class="${gan >= 0 ? "g" : "p"}">${fEur(gan, 1)}</b></div>
+    <div class="f"><span>Margen empleado</span><b>${fEur(mar)}</b></div>
+    <div class="f"><span>Ganado en cerradas</span><b class="${cer >= 0 ? "g" : "p"}">${fEur(cer, 1)}</b></div>
+    <div class="f"><span>Total acumulado</span><b class="${gan + cer >= 0 ? "g" : "p"}">${fEur(gan + cer, 1)}</b></div>
+    <small>En euros, aproximado: margen con el apalancamiento de XTB (divisas 1:30/1:20, oro 1:20, petróleo y metales 1:10, cripto 1:2)${falta ? ". Faltan " + falta + " posiciones sin precio guardado" : ""}.</small>`;
+  c.style.display = "block";
+}
 async function pintaPosiciones(){
-  const l = posiciones(), cont = $("lPos");
+  const l = quitaDobles(), cont = $("lPos");
+  if (!l.length) $("posRes").style.display = "none";
   if (!l.length){ cont.innerHTML = `<div class="vacio" style="margin-bottom:12px">No tienes posiciones apuntadas. Pulsa «Apuntar una posición», o pulsa un mercado en un radar y elige «Apuntar mi posición».</div>`; return; }
   cont.innerHTML = l.map(p => {
     const m = merDe(p.sim);
@@ -1601,8 +1664,11 @@ async function pintaPosiciones(){
     } else abreGrafPos(p.sim, p.tv, "fic");
   });
   if (!store("bolsa_llave")){ l.forEach(p => { const el = $("r" + p.id); if (el) el.innerHTML = "<small>Pon tu llave de GitHub en ⚙️ para ver el precio</small>"; }); return; }
+  const precios = {};
+  for (const k in _px) delete _px[k];
   for (const sim of [...new Set(l.map(p => p.sim))]){
     let u = null; try{ u = await ultimoPrecio(sim); }catch(e){}
+    precios[sim] = u ? u.precio : null; _px[sim] = precios[sim];
     l.filter(p => p.sim === sim).forEach(p => {
       const el = $("r" + p.id); if (!el) return;
       if (!u){ el.innerHTML = "<small>No hay precio guardado de este mercado: ejecuta un radar y vuelve</small>"; return; }
@@ -1612,6 +1678,7 @@ async function pintaPosiciones(){
       el.innerHTML = `${d ? fDin(d) + " · " : ""}${sg}${Math.abs(r.pct).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2})} %<small>Ahora ${fmtP(u.precio, p.precio)} (${sg}${fmtP(Math.abs(r.dif), p.precio)}) · precio de la última vela guardada ${hace(u.guardado)}. Ejecuta un radar para actualizarlo.</small>`;
     });
   }
+  pintaResumen(l, precios);
 }
 // Botones rápidos LARGO / CORTO del gráfico: apuntan al momento una posición con el lote elegido,
 // al último precio guardado y con la hora de ahora (pulsar dos veces para no apuntar sin querer)
@@ -1634,6 +1701,7 @@ function rapida(dir, b){
   const v = +String($("gLote").value).replace(",", "."), lote = v > 0 ? v : loteDef();
   store("bolsa_lote", lote);
   const sim = simGraf, tv = MERCADOS.some(m => m[0] === sim) ? merDe(sim)[2] : (simTV || merDe(sim)[2]);
+  if (posiciones().some(x => x.sim === sim && x.dir === dir && x.precio === G.ultimo && Date.now() / 1000 - x.hora < 3)) return;   // doble toque: no repetir
   const p = {id: String(Date.now()), sim, tv, dir, precio: G.ultimo, hora: Math.floor(Date.now() / 1000), sl: null, tp: null, lote};
   const l = posiciones(); l.push(p); l.sort((a, c) => c.hora - a.hora); guardaPos(l);
   if (navigator.vibrate) try{ navigator.vibrate(60); }catch(e){}
