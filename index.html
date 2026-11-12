@@ -233,7 +233,7 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 .seg button.on.c{background:var(--rojo);color:#fff;border-color:var(--rojo)}
 .dos{display:flex;gap:8px}.dos>div{flex:1}
 .mini{background:none;border:0;color:var(--oro);font:700 13px Archivo,sans-serif;cursor:pointer;padding:2px 0}
-.posres{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;display:none}
+.posres{position:sticky;top:0;z-index:5;background:var(--panel);border:2px solid #C9A2FF;border-radius:16px;padding:12px 14px;margin-bottom:12px;display:none}
 .posres .f{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:3px 0}
 .posres .f span{font:600 14px Archivo,sans-serif;color:var(--mut)}
 .posres .f b{font:900 20px "JetBrains Mono",monospace}
@@ -1623,27 +1623,53 @@ async function margenEUR(p, precio){
   return eur == null ? null : eur / apal(p.sim);
 }
 const fEur = (v, sg) => (sg ? (v >= 0 ? "+" : "−") : "") + Math.abs(v).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €";
-async function pintaResumen(l, precios){
+// Espera como mucho ms milisegundos; si no llega, devuelve null (que el resumen no se quede colgado)
+const conTope = (pr, ms) => Promise.race([pr.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
+// Respaldo si no hay precio guardado para pasar a euros (aprox.)
+const EUR_APROX = {USD: 1.10, JPY: 165, GBP: 0.85, CHF: 0.95, CAD: 1.50, AUD: 1.65, NZD: 1.80, CNH: 7.80, SEK: 11.5, NOK: 11.7, PLN: 4.3, MXN: 20, TRY: 38, ZAR: 20, HUF: 400, CZK: 25, DKK: 7.46, SGD: 1.45, HKD: 8.6};
+async function aEURseg(v, mon){
+  if (v == null) return null;
+  const r = await conTope(aEUR(v, mon), 4000);
+  if (r != null && isFinite(r)) return r;
+  if (mon === "EUR") return v;
+  return EUR_APROX[mon] ? v / EUR_APROX[mon] : null;
+}
+async function margenSeg(p, precio){
+  const r = await conTope(margenEUR(p, precio), 4000);
+  if (r != null && isFinite(r)) return r;
+  const t = tamLote(p.sim); if (!t || p.lote == null) return null;
+  const base = /^[A-Z]{6}$/.test(p.sim) && !TAM_LOTE[p.sim] ? p.sim.slice(0,3) : null;
+  const nom = t * p.lote, eur = base ? (base === "EUR" ? nom : EUR_APROX[base] ? nom / EUR_APROX[base] : null) : nom * precio / EUR_APROX.USD;
+  return eur == null ? null : eur / apal(p.sim);
+}
+function cajaResumen(n, gan, mar, cer, nota){
   const c = $("posRes");
+  const v = x => x == null ? "…" : x;
+  c.innerHTML = `<div class="f"><span>💼 Invertido (margen) en ${n} abiertas</span><b>${v(mar == null ? null : fEur(mar))}</b></div>
+    <div class="f"><span>📈 Beneficio ahora (abiertas)</span><b class="${gan == null ? "" : gan >= 0 ? "g" : "p"}">${v(gan == null ? null : fEur(gan, 1))}</b></div>
+    <div class="f"><span>✅ Ganado en cerradas</span><b class="${cer == null ? "" : cer >= 0 ? "g" : "p"}">${v(cer == null ? null : fEur(cer, 1))}</b></div>
+    <div class="f"><span>Σ Total acumulado</span><b class="${gan == null || cer == null ? "" : gan + cer >= 0 ? "g" : "p"}">${v(gan == null || cer == null ? null : fEur(gan + cer, 1))}</b></div>
+    <small>${nota}</small>`;
+  c.style.display = "block";
+}
+async function pintaResumen(l, precios){
   let gan = 0, mar = 0, falta = 0;
   for (const p of l){
-    const pr = precios[p.sim]; if (pr == null){ falta++; continue; }
-    const d = dinero(p, pr), g = d ? await aEUR(d.v, d.m) : null, m = await margenEUR(p, pr);
-    if (g == null || m == null){ falta++; continue; }
-    gan += g; mar += m;
+    const pr = precios[p.sim] != null ? precios[p.sim] : p.precio;
+    if (precios[p.sim] == null) falta++;
+    const d = dinero(p, pr);
+    const g = d ? await aEURseg(d.v, d.m) : 0, m = await margenSeg(p, pr);
+    if (g != null) gan += g;
+    if (m != null) mar += m;
   }
   let cer = 0;
-  for (const h of (store("bolsa_cerradas") || [])){ if (h.dinero == null) continue; const v = await aEUR(h.dinero, h.mon || "USD"); if (v != null) cer += v; }
-  c.innerHTML = `<div class="f"><span>Ganancia abierta (${l.length})</span><b class="${gan >= 0 ? "g" : "p"}">${fEur(gan, 1)}</b></div>
-    <div class="f"><span>Margen empleado</span><b>${fEur(mar)}</b></div>
-    <div class="f"><span>Ganado en cerradas</span><b class="${cer >= 0 ? "g" : "p"}">${fEur(cer, 1)}</b></div>
-    <div class="f"><span>Total acumulado</span><b class="${gan + cer >= 0 ? "g" : "p"}">${fEur(gan + cer, 1)}</b></div>
-    <small>En euros, aproximado: margen con el apalancamiento de XTB (divisas 1:30/1:20, oro 1:20, petróleo y metales 1:10, cripto 1:2)${falta ? ". Faltan " + falta + " posiciones sin precio guardado" : ""}.</small>`;
-  c.style.display = "block";
+  for (const h of (store("bolsa_cerradas") || [])){ if (h.dinero == null) continue; const v = await aEURseg(h.dinero, h.mon || "USD"); if (v != null) cer += v; }
+  cajaResumen(l.length, gan, mar, cer, "En euros, aproximado: margen con el apalancamiento de XTB (divisas 1:30/1:20, oro 1:20, petróleo y metales 1:10, cripto 1:2)" + (falta ? ". " + falta + " sin precio guardado (cuentan a precio de entrada)" : "") + ".");
 }
 async function pintaPosiciones(){
   const l = quitaDobles(), cont = $("lPos");
   if (!l.length) $("posRes").style.display = "none";
+  else cajaResumen(l.length, null, null, null, "Calculando…");
   if (!l.length){ cont.innerHTML = `<div class="vacio" style="margin-bottom:12px">No tienes posiciones apuntadas. Pulsa «Apuntar una posición», o pulsa un mercado en un radar y elige «Apuntar mi posición».</div>`; return; }
   cont.innerHTML = l.map(p => {
     const m = merDe(p.sim);
@@ -1663,11 +1689,11 @@ async function pintaPosiciones(){
       else { b.dataset.seguro = 1; b.textContent = "¿Quitar? Pulsa otra vez"; setTimeout(() => { if (b.isConnected){ delete b.dataset.seguro; b.textContent = "🔒 Cerrar"; } }, 4000); }
     } else abreGrafPos(p.sim, p.tv, "fic");
   });
-  if (!store("bolsa_llave")){ l.forEach(p => { const el = $("r" + p.id); if (el) el.innerHTML = "<small>Pon tu llave de GitHub en ⚙️ para ver el precio</small>"; }); return; }
+  if (!store("bolsa_llave")){ l.forEach(p => { const el = $("r" + p.id); if (el) el.innerHTML = "<small>Pon tu llave de GitHub en ⚙️ para ver el precio</small>"; }); pintaResumen(l, {}); return; }
   const precios = {};
   for (const k in _px) delete _px[k];
   for (const sim of [...new Set(l.map(p => p.sim))]){
-    let u = null; try{ u = await ultimoPrecio(sim); }catch(e){}
+    let u = await conTope(ultimoPrecio(sim), 8000);
     precios[sim] = u ? u.precio : null; _px[sim] = precios[sim];
     l.filter(p => p.sim === sim).forEach(p => {
       const el = $("r" + p.id); if (!el) return;
@@ -2984,7 +3010,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.11-29";
+const APP_VERSION = "2026.11.12-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
