@@ -266,6 +266,10 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
 #ayuda{position:fixed;z-index:50;max-width:290px;background:#FFF7D6;color:#1A1A1A;border:1px solid var(--oro);border-radius:12px;padding:9px 12px;font:500 13px/1.4 Archivo,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s}
 #ayuda.on{opacity:1;transform:none}
 #ayuda::before{content:"💡 ";}
+button.girando{position:relative;pointer-events:none;opacity:.85}
+button.girando::after{content:"";position:absolute;right:6px;top:50%;width:14px;height:14px;margin-top:-9px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:gira .7s linear infinite}
+button.ico.girando::after{right:50%;margin-right:-9px}
+@keyframes gira{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -3115,9 +3119,29 @@ $("bSalir").onclick = () => {
   // Si el sistema no deja cerrar la ventana (p. ej. en el móvil), se deja la app en blanco
   setTimeout(() => { document.body.innerHTML = '<div style="display:flex;height:90vh;align-items:center;justify-content:center;text-align:center;font:700 20px Archivo,sans-serif;color:#9FB3A8">BOLSA-LORENZITO cerrada.<br>Ya puedes quitarla de la pantalla.</div>'; }, 300);
 };
+// ---------- Rueda girando en los botones de actualizar mientras trabajan ----------
+(() => {
+  const esAct = b => /actualiz|↻|🔄|recarg|refresc/i.test((b.textContent || "") + " " + (b.title || "") + " " + (b.getAttribute("aria-label") || ""));
+  let pend = 0, btn = null, tClick = 0, tFin = 0;
+  const quita = () => { if (btn && pend <= 0 && Date.now() >= tFin){ btn.classList.remove("girando"); btn = null; } };
+  document.addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest("button"); if (!b || !esAct(b)) return;
+    if (btn && btn !== b) btn.classList.remove("girando");
+    btn = b; tClick = Date.now(); tFin = tClick + 700; b.classList.add("girando");
+    setTimeout(quita, 750);
+    if (typeof buscarVersionNueva === "function") setTimeout(buscarVersionNueva, 0);   // de paso, mira si hay versión nueva de la app
+  }, true);
+  const f0 = window.fetch.bind(window);
+  window.fetch = (...a) => {
+    const mio = btn && Date.now() - tClick < 2000; if (mio) pend++;
+    const fin = () => { if (mio){ pend--; setTimeout(quita, 50); } };
+    return f0(...a).then(r => { fin(); return r; }, e => { fin(); throw e; });
+  };
+  setInterval(() => { if (btn && Date.now() - tClick > 60000){ pend = 0; quita(); } }, 5000);
+})();
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-9";
+const APP_VERSION = "2026.11.12-10";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
