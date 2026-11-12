@@ -2507,11 +2507,11 @@ async function igDetalle(epic){
 }
 // Nombres de cTrader/otros que en la app son el mismo mercado (GOLD = XAUUSD…)
 const IG_ALIAS = {GOLD: "XAUUSD", ORO: "XAUUSD", SILVER: "XAGUSD", PLATA: "XAGUSD", PLATINUM: "XPTUSD", PLATINO: "XPTUSD", PALLADIUM: "XPDUSD", PALADIO: "XPDUSD",
-  XTIUSD: "USOIL", WTI: "USOIL", "OIL.WTI": "USOIL", USOUSD: "USOIL", SPOTCRUDE: "USOIL", BITCOIN: "BTCUSD", ETHEREUM: "ETHUSD"};
+  XTIUSD: "USOIL", WTI: "USOIL", "PETROLEO WTI": "USOIL", "PETRÓLEO WTI": "USOIL", PETROLEO: "USOIL", "PETRÓLEO": "USOIL", "OIL WTI": "USOIL", "CL=F": "USOIL", USCRUDE: "USOIL", "US CRUDE": "USOIL", XAU: "XAUUSD", "GC=F": "XAUUSD", XAG: "XAGUSD", "SI=F": "XAGUSD", "OIL.WTI": "USOIL", USOUSD: "USOIL", SPOTCRUDE: "USOIL", BITCOIN: "BTCUSD", ETHEREUM: "ETHUSD"};
 const IG_NOMBRE = {XAUUSD: /spot gold|^gold/i, XAGUSD: /spot silver|^silver/i, XPTUSD: /platinum/i, XPDUSD: /palladium/i, USOIL: /us crude|wti/i, BTCUSD: /bitcoin/i, ETHUSD: /ether/i};
 async function igVale(epic){ try{ const d = await igDetalle(epic); return d.pip > 0; }catch(e){ return false; } }
 async function igEpic(sim0){
-  const sim = IG_ALIAS[sim0] || sim0;
+  const sim = IG_ALIAS[String(sim0).toUpperCase().trim()] || sim0;
   if (IG.epics[sim] && await igVale(IG.epics[sim])){ IG.epics[sim0] = IG.epics[sim]; return IG.epics[sim]; }
   delete IG.epics[sim]; delete IG.epics[sim0];
   let epic = null;
@@ -3108,7 +3108,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-7";
+const APP_VERSION = "2026.11.12-8";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
