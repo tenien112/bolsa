@@ -2544,7 +2544,7 @@ const igPts = (dif, raw, d) => d.pip > 0 ? dif / igFac(raw, d) / d.pip : dif;
 let TK = null;
 const fE = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).replace(".", ",") + " €";
 function tkFuera(){
-  if (TK && TK.serie){ try{ TK.serie.removePriceLine(TK.lSL); TK.serie.removePriceLine(TK.lTP); TK.serie.removePriceLine(TK.lEn); }catch(e){} }
+  if (TK && TK.serie){ for (const l of [TK.lEn, TK.lSL, TK.lTP]) if (l) try{ TK.serie.removePriceLine(l); }catch(e){} }
   TK = null; $("gTk").style.display = "none"; $("gTk").innerHTML = "";
   if (G && G.chart) G.chart.applyOptions({handleScroll: true, handleScale: true});
 }
@@ -2553,17 +2553,12 @@ function tkLineas(){
   if (TK.serie !== G.serie){
     TK.serie = G.serie;
     TK.lEn = G.serie.createPriceLine({price: TK.ent, color: "#F5C451", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: TK.dir === "L" ? "▲ ENTRADA" : "▼ ENTRADA"});
-    TK.lSL = G.serie.createPriceLine({price: TK.sl, color: "#E5484D", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "SL"});
-    TK.lTP = G.serie.createPriceLine({price: TK.tp, color: "#2FBF71", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "TP"});
   }
   const largo = TK.dir === "L";
-  const eSL = -Math.abs(TK.ent - TK.sl) / TK.d.pip * TK.eurPunto, eTP = Math.abs(TK.tp - TK.ent) / TK.d.pip * TK.eurPunto;
-  TK.lSL.applyOptions({price: TK.sl, title: "SL " + fE(eSL) + " ⇕"}); TK.lTP.applyOptions({price: TK.tp, title: "TP " + fE(eTP) + " ⇕"});
   const dec = TK.ent < 10 ? 5 : TK.ent < 300 ? 3 : 2, f = v => v.toFixed(dec);
   $("gTk").innerHTML = `<div class="fil"><span>${largo ? "▲ COMPRAR" : "▼ VENDER"} ${esc(merDe(TK.sim)[1])}</span><span>Tamaño <b>${String(TK.tam).replace(".", ",")}</b></span><span>Entrada ≈ <b>${f(TK.ent)}</b></span>
     <span>💰 Margen: <b>${TK.margen > 0 ? TK.margen.toFixed(2).replace(".", ",") + " €" : "—"}</b></span></div>
-    <div class="fil"><span style="color:var(--rojo)">SL <b>${f(TK.sl)}</b> (${fE(eSL)})</span><span style="color:var(--verde)">TP <b>${f(TK.tp)}</b> (${fE(eTP)})</span></div>
-    <small>Arrastra en el gráfico la línea roja (stop loss) o la verde (take profit) para moverlas. Disponible en la cuenta: ${(+((IG.cuenta && IG.cuenta.balance && IG.cuenta.balance.available) || 0)).toFixed(2).replace(".", ",")} €</small>
+    <small>Sin stop loss ni take profit. Disponible en la cuenta: ${(+((IG.cuenta && IG.cuenta.balance && IG.cuenta.balance.available) || 0)).toFixed(2).replace(".", ",")} €</small>
     <div class="bt"><button class="no" id="tkNo">Cancelar</button><button class="ok ${largo ? "l" : "c"}" id="tkOk">✅ CONFIRMAR ${largo ? "COMPRA" : "VENTA"}</button></div>`;
   $("tkNo").onclick = tkFuera; $("tkOk").onclick = tkEnviar;
   $("gTk").style.display = "block";
@@ -2586,12 +2581,8 @@ async function igTicket(dir){
     if (u && u.close > 0 && Math.abs(ent / u.close - 1) > 0.03) throw new Error("el precio de IG (" + ent + ") no cuadra con el gráfico");
     const margen = ent / d.pip * d.vPip * tam * d.mf / 100 / eurA;
     const minP = Math.max(d.minDist || 0, 1);
-    // Las líneas salen a 2 veces el tamaño medio de las últimas velas del gráfico; luego las mueves tú
-    const vs = G && G.serie ? G.serie.data().slice(-14).filter(v => v.high != null) : [];
-    const rango = vs.length ? vs.reduce((a, v) => a + (v.high - v.low), 0) / vs.length : 0;
-    const dist = Math.max(rango * 2, minP * d.pip * 3);
-    const dSL = dist, dTP = dist;
-    TK = {dir, sim, epic, d, tam, ent, eurPunto, margen, minP, sl: dir === "L" ? ent - dSL : ent + dSL, tp: dir === "L" ? ent + dTP : ent - dTP, serie: null};
+    // Sin stop loss ni take profit: los pone Lorenzo después
+    TK = {dir, sim, epic, d, tam, ent, eurPunto, margen, minP, sl: null, tp: null, serie: null};
     tkLineas();
   }catch(e){ tkFuera(); toast("❌ IG: " + e.message, 6000); }
 }
@@ -2600,7 +2591,7 @@ async function igTicket(dir){
   const caja = $("gCaja"); let arr = null;
   const yDe = e => e.clientY - caja.getBoundingClientRect().top;
   caja.addEventListener("pointerdown", e => {
-    if (!TK || !G || TK.serie !== G.serie) return;
+    if (!TK || !G || TK.serie !== G.serie || TK.sl == null || TK.tp == null) return;
     const y = yDe(e), ySL = G.serie.priceToCoordinate(TK.sl), yTP = G.serie.priceToCoordinate(TK.tp);
     const dSL = ySL == null ? 1e9 : Math.abs(y - ySL), dTP = yTP == null ? 1e9 : Math.abs(y - yTP);
     if (Math.min(dSL, dTP) > 18) return;
@@ -2625,15 +2616,14 @@ async function tkEnviar(){
   if (!TK || IG.pidiendo) return;
   const k = TK; IG.pidiendo = true; $("tkOk").disabled = true; $("tkOk").textContent = "Enviando…";
   try{
-    const dSL = Math.round(Math.abs(k.ent - k.sl) / k.d.pip * 10) / 10, dTP = Math.round(Math.abs(k.tp - k.ent) / k.d.pip * 10) / 10;
-    const r = await ig("/positions/otc", {metodo: "POST", version: "2", cuerpo: {epic: k.epic, expiry: "-", direction: k.dir === "L" ? "BUY" : "SELL", size: k.tam, orderType: "MARKET", currencyCode: k.d.cur, forceOpen: true, guaranteedStop: false, stopDistance: dSL, limitDistance: dTP}});
+    const r = await ig("/positions/otc", {metodo: "POST", version: "2", cuerpo: {epic: k.epic, expiry: "-", direction: k.dir === "L" ? "BUY" : "SELL", size: k.tam, orderType: "MARKET", currencyCode: k.d.cur, forceOpen: true, guaranteedStop: false}});
     let c = null;
     for (let i = 0; i < 4 && !c; i++){ try{ c = await ig("/confirms/" + r.dealReference); }catch(e){ await new Promise(ok => setTimeout(ok, 700)); } }
     if (!c) throw new Error("IG no confirma la orden: mira tus posiciones");
     if (c.dealStatus !== "ACCEPTED") throw new Error(igErr(c.reason));
     if (navigator.vibrate) try{ navigator.vibrate([60, 60, 60]); }catch(e){}
     tkFuera();
-    toast(`✅ IG ${igModo()}: ${k.dir === "L" ? "▲ COMPRA" : "▼ VENTA"} ${merDe(k.sim)[1]} · tamaño ${String(k.tam).replace(".", ",")} a ${igNum(c.level)} · SL ${fE(-dSL * k.eurPunto)} · TP ${fE(dTP * k.eurPunto)}`, 7000);
+    toast(`✅ IG ${igModo()}: ${k.dir === "L" ? "▲ COMPRA" : "▼ VENTA"} ${merDe(k.sim)[1]} · tamaño ${String(k.tam).replace(".", ",")} a ${igNum(c.level)} · sin SL ni TP`, 7000);
     await igPintaPos();
   }catch(e){ toast("❌ IG: " + e.message, 6000); if ($("tkOk")){ $("tkOk").disabled = false; $("tkOk").textContent = "✅ CONFIRMAR " + (k.dir === "L" ? "COMPRA" : "VENTA"); } }
   finally{ IG.pidiendo = false; }
@@ -3063,7 +3053,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-3";
+const APP_VERSION = "2026.11.12-4";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
