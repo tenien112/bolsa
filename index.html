@@ -2539,12 +2539,21 @@ async function igEurA(cur){
   const base = (IG.cuenta && IG.cuenta.currency) || "EUR";
   if (cur === base) return 1;
   if (IG.cambio[cur] && Date.now() - IG.cambio[cur].t < 600e3) return IG.cambio[cur].v;
-  const e = await igEpic(base + cur), d = await igDetalle(e);
-  const s = await ig("/markets/" + encodeURIComponent(e), {version: "3"});
-  const v = igReal((igNum(s.snapshot.bid) + igNum(s.snapshot.offer)) / 2, IG_REF_EUR[cur] || ((igNum(s.snapshot.bid) + igNum(s.snapshot.offer)) / 2));
-  if (IG_REF_EUR[cur] && Math.abs(v / IG_REF_EUR[cur] - 1) > 0.5) throw new Error("cambio " + base + "/" + cur + " raro");
-  if (!(v > 0)) throw new Error("sin cambio " + base + "/" + cur);
-  IG.cambio[cur] = {v, t: Date.now()}; return v;
+  const ref = IG_REF_EUR[cur];
+  // Se prueban varios mercados de IG para el cambio; si ninguno da precio, se usa un cambio aproximado
+  // (solo sirve para calcular margen y € por punto; la orden no depende de él)
+  const cands = ["CS.D." + base + cur + ".MINI.IP", "CS.D." + base + cur + ".CFD.IP", "CS.D." + base + cur + ".TODAY.IP"];
+  try{ const e = await igEpic(base + cur); if (!cands.includes(e)) cands.unshift(e); }catch(err){}
+  for (const e of cands){
+    try{
+      const s = await ig("/markets/" + encodeURIComponent(e), {version: "3"}), sn = s.snapshot || {};
+      const mid = (igNum(sn.bid) + igNum(sn.offer)) / 2;
+      const v = igReal(mid, ref || mid);
+      if (v > 0 && (!ref || Math.abs(v / ref - 1) < 0.5)){ IG.cambio[cur] = {v, t: Date.now()}; return v; }
+    }catch(err){}
+  }
+  if (ref){ IG.cambio[cur] = {v: ref, t: Date.now(), aprox: true}; return ref; }
+  throw new Error("sin cambio " + base + "/" + cur);
 }
 const igTam = epic => (store("bolsa_ig_tam") || {})[epic];
 // Puntos de IG entre dos precios de IG (IG da unos mercados en decimales, 1.16123, y otros en puntos, 11612.3)
@@ -3108,7 +3117,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-8";
+const APP_VERSION = "2026.11.12-9";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
