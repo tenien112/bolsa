@@ -895,12 +895,14 @@ function mezclaHist(rec, hist){
 }
 let G = null;   // {chart, serie, iCambio}
 let simGraf = null, simTV = null;   // mercado del gráfico abierto
+let posCerradaVer = null;   // posición cerrada del historial que se está viendo en el gráfico
 function cierraGraf(){
   const abierto = $("graf").classList.contains("on");
   $("graf").classList.remove("on");
   if (abierto && simTV){ const x = simTV; marcaVisto(x); setTimeout(() => irAlVisto(x), 50); }
   if (G && G.chart) G.chart.remove();
   grafSeq++; limpiaCaja();
+  posCerradaVer = null;
   G = null; $("gPL").style.display = "none"; $("gLinea").style.display = "none"; $("gRadar").style.display = "none"; $("gSig").innerHTML = "";
 }
 function colocaLinea(){
@@ -1155,6 +1157,10 @@ async function abreGraf(sim, tf, cambio, titulo, tfs, selRadar){
     if (pe != null){ let k = 0; while (k < n && velas[k].time <= pe) k++; i0 = Math.min(k - 25, n - 90); }
     chart.timeScale().setVisibleLogicalRange({from: Math.max(0, i0), to: n + 4});
   }
+  if (posCerradaVer && posCerradaVer.sim === sim && posCerradaVer._iE != null){
+    const a = posCerradaVer._iE, b = posCerradaVer._iC != null ? posCerradaVer._iC : n - 1, m = Math.max(10, Math.round((b - a) * 0.5));
+    chart.timeScale().setVisibleLogicalRange({from: Math.max(0, a - m), to: Math.min(n + 4, b + m)});
+  } else if (posCerradaVer && posCerradaVer.sim === sim) nota += " La entrada es anterior a estas velas: pulsa una temporalidad mayor.";
   $("gNota").textContent = notaPos + nota;
   chart.timeScale().subscribeVisibleLogicalRangeChange(colocaLinea);
   new ResizeObserver(colocaLinea).observe($("gCaja"));
@@ -1178,8 +1184,7 @@ function enlazaHistorial(cont, alAbrir){
   const h = store("bolsa_cerradas") || [];
   cont.querySelectorAll(".hisi").forEach(b => b.onclick = () => {
     const x = h[+b.dataset.i]; if (!x) return; if (alAbrir) alAbrir();
-    simTV = x.tv;
-    abreGraf(x.sim, G && G.tf ? G.tf : "60", "", merDe(x.sim)[1] + " · H1", []);
+    abreGrafPos(x.sim, x.tv, "fic", null, G && G.tf ? G.tf : "60", x);
   });
 }
 $("gHisB").onclick = () => {
@@ -1196,7 +1201,7 @@ $("posHis").onclick = () => {
   if (c.innerHTML){ c.innerHTML = ""; return; }
   const t = htmlHistorial();
   c.innerHTML = t || `<div class="vacio">Aún no tienes posiciones cerradas.</div>`;
-  enlazaHistorial(c, () => abreCapa());
+  enlazaHistorial(c);
 };
 // Botón 📌 del gráfico: lista de posiciones abiertas; al pulsar una se abre su gráfico
 function marcaPosB(){
@@ -1574,7 +1579,8 @@ $("bPosIG").onclick = () => { ir("pPosIG"); pintaPosIG(); };
 $("posIGAct").onclick = () => pintaPosIG();
 // Abre el gráfico de una posición (IG o ficticia) con la línea amarilla del último cambio del radar elegido
 // (el mismo selector de radar que en BUSCAR VALOR) y la posición dibujada
-async function abreGrafPos(sim, tv, modo, idx, tf){
+async function abreGrafPos(sim, tv, modo, idx, tf, pc){
+  posCerradaVer = pc || null;
   if (!store("bolsa_llave")){ toast("Para ver el gráfico pon tu llave de GitHub en ⚙️", 4000); return; }
   if (idx == null) idx = bRadarIdx();
   const R = B_RADARES[idx], enMer = MERCADOS.some(m => m[0] === sim);
@@ -1584,7 +1590,7 @@ async function abreGrafPos(sim, tv, modo, idx, tf){
   grafPend = modo === "ig" ? "ig" : fuenteGraf === "ctrader" ? "ct" : "app";
   simTV = tv;
   if (!$("graf").classList.contains("on")) abreCapa();
-  abreGraf(sim, tf || "60", cambio, merDe(sim)[1] + " · H1", R.tfs, {i: idx, cambia: (k, t) => abreGrafPos(sim, tv, modo, k, t)});
+  abreGraf(sim, tf || "60", cambio, merDe(sim)[1] + " · H1", R.tfs, {i: idx, cambia: (k, t) => abreGrafPos(sim, tv, modo, k, t, pc)});
 }
 // Quita posiciones repetidas (mismo mercado, sentido, lote y entrada apuntadas con menos de 10 s de diferencia)
 function quitaDobles(){
@@ -1785,16 +1791,27 @@ $("gCorto").onclick = function(){ rapida("C", this); };
 
 // Dibuja en el gráfico las posiciones apuntadas de ese mercado
 function dibujaPosiciones(sim, serie, velas, L){
-  const l = posiciones().filter(p => p.sim === sim); if (!l.length) return "";
+  const l = posiciones().filter(p => p.sim === sim);
+  const pc = posCerradaVer && posCerradaVer.sim === sim ? posCerradaVer : null;
+  if (!l.length && !pc) return "";
   const marcas = [], ultimo = velas[velas.length - 1].close;
+  const velaDe = t => { let v = null; for (const x of velas){ if (x.time <= t) v = x; else break; } return v; };
+  if (pc){
+    const larga = pc.dir === "L", gana = pc.pct == null || pc.pct >= 0;
+    serie.createPriceLine({price: pc.precio, color: "#C9A2FF", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "ENTRADA"});
+    serie.createPriceLine({price: pc.cierre, color: gana ? "#2FBF71" : "#E5484D", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "CIERRE"});
+    const vE = velaDe(aMadrid(pc.hora)), vC = velaDe(aMadrid(pc.horaCierre));
+    if (vE) marcas.push({time: vE.time, position: larga ? "belowBar" : "aboveBar", color: "#C9A2FF", shape: larga ? "arrowUp" : "arrowDown", text: (larga ? "LARGO " : "CORTO ") + fHora(pc.hora)});
+    if (vC) marcas.push({time: vC.time, position: larga ? "aboveBar" : "belowBar", color: gana ? "#2FBF71" : "#E5484D", shape: "circle", text: "CIERRE " + fHora(pc.horaCierre) + (pc.dinero != null ? " " + fDin({v: pc.dinero, m: pc.mon}) : "")});
+    pc._iE = vE ? velas.indexOf(vE) : null; pc._iC = vC ? velas.indexOf(vC) : null;
+  }
   let txt = [];
   for (const p of l){
     const larga = p.dir === "L";
     serie.createPriceLine({price: p.precio, color: "#C9A2FF", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: larga ? "▲" : "▼"});
     if (p.sl != null) serie.createPriceLine({price: p.sl, color: "#E5484D", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "SL"});
     if (p.tp != null) serie.createPriceLine({price: p.tp, color: "#2FBF71", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "TP"});
-    const tE = aMadrid(p.hora); let v = null;
-    for (const x of velas){ if (x.time <= tE) v = x; else break; }
+    const v = velaDe(aMadrid(p.hora));
     if (v) marcas.push({time: v.time, position: larga ? "belowBar" : "aboveBar", color: "#C9A2FF", shape: larga ? "arrowUp" : "arrowDown", text: "", size: 0.6});
     const r = resultado(p, ultimo), sg = r.dif >= 0 ? "+" : "−";
     txt.push(`📌 Tu posición: ${larga ? "LARGO" : "CORTO"} desde ${fmtP(p.precio)} → ahora ${fmtP(ultimo, p.precio)} (${sg}${Math.abs(r.pct).toLocaleString("es-ES", {maximumFractionDigits: 2})} %).`);
@@ -1802,7 +1819,7 @@ function dibujaPosiciones(sim, serie, velas, L){
   marcas.sort((a, b) => a.time - b.time);
   serie.setMarkers(marcas);
   // Que el ajuste automático deje siempre a la vista la entrada, el stop loss y el take profit
-  const precios = l.flatMap(p => [p.precio, p.sl, p.tp]).filter(x => x != null);
+  const precios = l.flatMap(p => [p.precio, p.sl, p.tp]).concat(pc ? [pc.precio, pc.cierre] : []).filter(x => x != null);
   serie.applyOptions({autoscaleInfoProvider: f => {
     const r = f(); if (!r || !r.priceRange) return r;
     r.priceRange.minValue = Math.min(r.priceRange.minValue, ...precios);
@@ -3010,7 +3027,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-1";
+const APP_VERSION = "2026.11.12-2";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
