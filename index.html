@@ -2505,23 +2505,30 @@ async function igDetalle(epic){
     mf: ins.marginFactor != null && ins.marginFactorUnit !== "POINTS" ? igNum(ins.marginFactor) : igNum(((ins.marginDepositBands || [])[0] || {}).margin) || 0};
   IG.mer[epic] = d; return d;
 }
-async function igEpic(sim){
-  if (IG.epics[sim]) return IG.epics[sim];
+// Nombres de cTrader/otros que en la app son el mismo mercado (GOLD = XAUUSD…)
+const IG_ALIAS = {GOLD: "XAUUSD", ORO: "XAUUSD", SILVER: "XAGUSD", PLATA: "XAGUSD", PLATINUM: "XPTUSD", PLATINO: "XPTUSD", PALLADIUM: "XPDUSD", PALADIO: "XPDUSD",
+  XTIUSD: "USOIL", WTI: "USOIL", "OIL.WTI": "USOIL", USOUSD: "USOIL", SPOTCRUDE: "USOIL", BITCOIN: "BTCUSD", ETHEREUM: "ETHUSD"};
+const IG_NOMBRE = {XAUUSD: /spot gold|^gold/i, XAGUSD: /spot silver|^silver/i, XPTUSD: /platinum/i, XPDUSD: /palladium/i, USOIL: /us crude|wti/i, BTCUSD: /bitcoin/i, ETHUSD: /ether/i};
+async function igVale(epic){ try{ const d = await igDetalle(epic); return d.pip > 0; }catch(e){ return false; } }
+async function igEpic(sim0){
+  const sim = IG_ALIAS[sim0] || sim0;
+  if (IG.epics[sim] && await igVale(IG.epics[sim])){ IG.epics[sim0] = IG.epics[sim]; return IG.epics[sim]; }
+  delete IG.epics[sim]; delete IG.epics[sim0];
   let epic = null;
   if (/^[A-Z]{6}$/.test(sim) && !IG_BUSCA[sim]){
-    for (const e of ["CS.D." + sim + ".MINI.IP", "CS.D." + sim + ".CFD.IP"]){
-      try{ await igDetalle(e); epic = e; break; }catch(err){}
-    }
+    for (const e of ["CS.D." + sim + ".MINI.IP", "CS.D." + sim + ".CFD.IP"]) if (await igVale(e)){ epic = e; break; }
   }
   if (!epic){
-    const q = IG_BUSCA[sim] || (/^[A-Z]{6}$/.test(sim) ? sim.slice(0, 3) + "/" + sim.slice(3) : merDe(sim)[1].replace(/\(.*?\)/g, "").trim());
+    const q = IG_BUSCA[sim] || (/^[A-Z]{6}$/.test(sim) ? sim.slice(0, 3) + "/" + sim.slice(3) : merDe(sim0)[1].replace(/\(.*?\)/g, "").trim());
     const j = await ig("/markets?searchTerm=" + encodeURIComponent(q));
-    const l = (j.markets || []).filter(m => m.expiry === "-" && !/BINARY|OPT_|SPRINT/.test(m.instrumentType || ""));
-    const m = l.find(m => /mini/i.test(m.instrumentName)) || l[0];
-    if (!m) throw new Error("no encuentro " + merDe(sim)[1] + " en IG");
-    epic = m.epic;
+    let l = (j.markets || []).filter(m => m.expiry === "-" && !/BINARY|OPT_|SPRINT|KNOCK/.test(m.instrumentType || ""));
+    if (IG_NOMBRE[sim]){ const f = l.filter(m => IG_NOMBRE[sim].test(m.instrumentName || "") && /COMMODITIES|CURRENCIES|CRYPTO/.test(m.instrumentType || "")); if (f.length) l = f; }
+    // Primero los mini, luego el resto; se queda con el primero que IG deja operar (con tamaño de punto)
+    l.sort((a, b) => (/mini/i.test(b.instrumentName) ? 1 : 0) - (/mini/i.test(a.instrumentName) ? 1 : 0));
+    for (const m of l.slice(0, 6)) if (await igVale(m.epic)){ epic = m.epic; break; }
+    if (!epic) throw new Error("no encuentro " + merDe(sim0)[1] + " en IG para operar");
   }
-  IG.epics[sim] = epic; store("bolsa_ig_epics", IG.epics);
+  IG.epics[sim] = epic; IG.epics[sim0] = epic; store("bolsa_ig_epics", IG.epics);
   return epic;
 }
 // IG da los precios en distintas escalas (1.16123 o 11612.3): se elige la potencia de 10 que deja el precio más cerca de una referencia
@@ -3101,7 +3108,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-6";
+const APP_VERSION = "2026.11.12-7";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
