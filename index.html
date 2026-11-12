@@ -401,6 +401,8 @@ select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);b
   <h2>🏦 MIS POSICIONES EN IG</h2>
   <div id="lPosIG"></div>
   <button class="btn sec" id="posIGAct" style="margin-top:10px">↻ Actualizar</button>
+  <button class="btn sec" id="posIGHis" style="margin-top:10px">📜 Historial: posiciones cerradas en IG</button>
+  <div id="lHisIG" style="margin-top:12px"></div>
 </section>
 
 <!-- MIS POSICIONES FICTICIAS -->
@@ -1577,6 +1579,40 @@ $("bPos").onclick = () => ir("pPosMenu");
 $("bPosFic").onclick = () => { ir("pPos"); pintaPosiciones(); };
 $("bPosIG").onclick = () => { ir("pPosIG"); pintaPosIG(); };
 $("posIGAct").onclick = () => pintaPosIG();
+// Historial de IG: operaciones cerradas de los últimos 90 días (API /history/transactions)
+const igFechaUTC = t => t ? Math.floor(Date.parse(String(t).replace(" ", "T").replace(/\//g, "-") + (/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? "" : "Z")) / 1000) : null;
+function igPnl(x){ const t = String(x || ""); const m = t.replace(/,/g, "").match(/\d+(\.\d+)?/); if (!m) return null; return (t.includes("-") ? -1 : 1) * +m[0]; }
+let IG_HIS = [];
+$("posIGHis").onclick = async () => {
+  const c = $("lHisIG");
+  if (c.innerHTML){ c.innerHTML = ""; return; }
+  if (!igListo()){ c.innerHTML = '<div class="vacio">IG no está conectada. Conéctala en el botón 🏦 IG de la pantalla de inicio.</div>'; return; }
+  c.innerHTML = '<p class="sub">Leyendo tu historial de IG…</p>';
+  try{
+    const desde = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 19);
+    const j = await ig("/history/transactions?type=ALL_DEAL&from=" + desde + "&pageSize=200", {version: "2"});
+    IG_HIS = (j.transactions || []).filter(t => /DEAL|TRADE/i.test(t.transactionType || "DEAL")).map(t => {
+      const tam = String(t.size || ""), dir = tam.trim().startsWith("-") ? "C" : "L";
+      const p = {nombre: t.instrumentName || "", dir, tam: tam.replace(/^[+-]/, ""), ent: igNum(t.openLevel), cie: igNum(t.closeLevel),
+        hora: igFechaUTC(t.openDateUtc), horaCierre: igFechaUTC(t.dateUtc || t.date), pnl: igPnl(t.profitAndLoss), mon: t.currency || "EUR"};
+      return p;
+    }).sort((a, b) => (b.horaCierre || 0) - (a.horaCierre || 0));
+    if (!IG_HIS.length){ c.innerHTML = '<div class="vacio">No hay posiciones cerradas en IG en los últimos 90 días.</div>'; return; }
+    const tot = IG_HIS.reduce((a, x) => a + (x.pnl || 0), 0), gan = IG_HIS.filter(x => (x.pnl || 0) >= 0).length;
+    const eur = v => (v >= 0 ? "+" : "−") + Math.abs(v).toLocaleString("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €";
+    c.innerHTML = `<div class="tot" style="font:700 14px 'JetBrains Mono',monospace;padding:6px 8px 8px">Total 90 días: <span class="${tot >= 0 ? "hg" : "hp"}">${eur(tot)}</span> · ${gan} de ${IG_HIS.length} en positivo</div>` + IG_HIS.map((x, i) => {
+      const g = x.pnl == null ? "" : x.pnl >= 0 ? "hg" : "hp";
+      return `<button class="hisi ${x.dir === "C" ? "c" : ""}" data-i="${i}"><span class="f"><span>${esc(x.nombre)} <b class="${x.dir === "C" ? "c" : "l"}">${x.dir === "C" ? "▼ VENTA" : "▲ COMPRA"}</b></span><span class="res ${g}">${x.pnl != null ? eur(x.pnl) : ""}</span></span><small>Tamaño ${esc(x.tam).replace(".", ",")} · ${isNaN(x.ent) ? "" : x.ent} → ${isNaN(x.cie) ? "" : x.cie} · ${x.hora ? fHora(x.hora) : "?"} → ${x.horaCierre ? fHora(x.horaCierre) : "?"}</small></button>`;
+    }).join("");
+    c.querySelectorAll(".hisi").forEach(b => b.onclick = () => {
+      const x = IG_HIS[+b.dataset.i]; if (!x) return;
+      const sim = simDeIG({market: {epic: "", instrumentName: x.nombre}});
+      if (!sim){ toast("No sé qué mercado de la app es «" + x.nombre + "». Búscalo en BUSCAR VALOR y márcalo como favorito.", 6000); return; }
+      const pc = {sim, dir: x.dir, precio: x.ent, cierre: x.cie, hora: x.hora || x.horaCierre, horaCierre: x.horaCierre, dinero: x.pnl, mon: "€", pct: x.pnl};
+      abreGrafPos(sim, merDe(sim)[2], "ig", null, G && G.tf ? G.tf : "60", pc);
+    });
+  }catch(e){ c.innerHTML = '<div class="vacio">No se pudo leer el historial de IG: ' + esc(e.message) + "</div>"; }
+};
 // Abre el gráfico de una posición (IG o ficticia) con la línea amarilla del último cambio del radar elegido
 // (el mismo selector de radar que en BUSCAR VALOR) y la posición dibujada
 async function abreGrafPos(sim, tv, modo, idx, tf, pc){
@@ -3027,7 +3063,7 @@ $("bSalir").onclick = () => {
 };
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-2";
+const APP_VERSION = "2026.11.12-3";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
