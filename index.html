@@ -2601,10 +2601,12 @@ async function igTicket(dir){
     const t = store("bolsa_ig_tam") || {}; t[epic] = tam; store("bolsa_ig_tam", t);
     const j = await ig("/markets/" + encodeURIComponent(epic), {version: "3"}), sn = j.snapshot || {};
     const raw = igNum(dir === "L" ? sn.offer : sn.bid); if (!(raw > 0)) throw new Error("el mercado está cerrado en IG");
-    const ent = raw / igFac(raw, d), eurA = await igEurA(d.cur), eurPunto = tam * d.vPip / eurA;
+    const entIG = raw / igFac(raw, d), eurA = await igEurA(d.cur), eurPunto = tam * d.vPip / eurA;
     const u = G && G.serie ? G.serie.data().slice(-1)[0] : null;
+    // IG puede dar el precio en otra escala que el gráfico (plata 5046,4 centavos = 50,464 $): se pasa a la escala del gráfico
+    const ent = u && u.close > 0 ? igReal(raw, u.close) : entIG;
     if (u && u.close > 0 && Math.abs(ent / u.close - 1) > 0.03) throw new Error("el precio de IG (" + ent + ") no cuadra con el gráfico");
-    const margen = ent / d.pip * d.vPip * tam * d.mf / 100 / eurA;
+    const margen = entIG / d.pip * d.vPip * tam * d.mf / 100 / eurA;
     const minP = Math.max(d.minDist || 0, 1);
     // Sin stop loss ni take profit: los pone Lorenzo después
     TK = {dir, sim, epic, d, tam, ent, eurPunto, margen, minP, sl: null, tp: null, serie: null};
@@ -3143,7 +3145,7 @@ $("bSalir").onclick = () => {
 })();
 // ---------- Aviso de actualización ----------
 // Hay que cambiar APP_VERSION en cada actualización.
-const APP_VERSION = "2026.11.12-11";
+const APP_VERSION = "2026.11.13-1";
 (() => {
   const prev = store("bolsa_version");
   store("bolsa_version", APP_VERSION);
